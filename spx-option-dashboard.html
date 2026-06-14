@@ -1,0 +1,1178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPX Option Strategy Dashboard</title>
+  <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --ink: #17202a;
+      --muted: #64727f;
+      --line: #d9e0e7;
+      --accent: #186d7a;
+      --accent-2: #7b4d15;
+      --good: #177245;
+      --bad: #b3261e;
+      --warn: #b36b00;
+      --shadow: 0 10px 30px rgba(23, 32, 42, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.35;
+    }
+
+    .shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+
+    aside {
+      background: #101820;
+      color: #f3f7fa;
+      padding: 24px;
+      border-right: 1px solid #263542;
+    }
+
+    main {
+      padding: 26px;
+      overflow: auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 24px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 17px;
+      letter-spacing: 0;
+    }
+
+    .sub {
+      color: #b9c6d0;
+      font-size: 13px;
+      margin-bottom: 22px;
+    }
+
+    .control {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      color: inherit;
+      margin-bottom: 7px;
+    }
+
+    input, select, button {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font: inherit;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    aside input, aside select {
+      border-color: #384957;
+      background: #16232d;
+      color: #f3f7fa;
+    }
+
+    input[type="file"] {
+      padding: 7px;
+      font-size: 12px;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .btn {
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+    }
+
+    .btn:hover { background: #11535e; }
+    .btn:active { transform: translateY(1px); }
+
+    .hint {
+      color: #aab8c3;
+      font-size: 12px;
+      margin-top: 6px;
+    }
+
+    .status {
+      margin-top: 18px;
+      padding: 12px;
+      border: 1px solid #344652;
+      border-radius: 7px;
+      color: #d8e4ec;
+      background: #14212b;
+      font-size: 12px;
+      min-height: 42px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .metric, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    .metric {
+      padding: 15px;
+      min-height: 96px;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .metric .value {
+      margin-top: 8px;
+      font-size: 25px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .metric .note {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .panel {
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+
+    .panel-row {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+
+    .chart-wrap {
+      height: 280px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfd;
+      padding: 10px;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      border-bottom: 1px solid var(--line);
+      padding: 9px 8px;
+      text-align: right;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) {
+      text-align: left;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      background: #f8fafb;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .table-scroll {
+      max-height: 350px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+    }
+
+    .pos { color: var(--good); font-weight: 750; }
+    .neg { color: var(--bad); font-weight: 750; }
+    .warn { color: var(--warn); font-weight: 750; }
+
+    .empty {
+      padding: 34px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-end;
+      margin-bottom: 16px;
+    }
+
+    .topline p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #e8f2f3;
+      color: #124f58;
+      font-size: 12px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1020px) {
+      .shell { grid-template-columns: 1fr; }
+      aside { border-right: 0; }
+      .grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+      .panel-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      main, aside { padding: 18px; }
+      .grid { grid-template-columns: 1fr; }
+      .split { grid-template-columns: 1fr; }
+      .topline { display: block; }
+      th, td { padding: 8px 6px; font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <h1>SPX Options</h1>
+      <div class="sub">No stop loss strategy scanner for fixed-width credit spreads and iron condors.</div>
+
+      <div class="control">
+        <label for="folderInput">CSV folder</label>
+        <input id="folderInput" type="file" accept=".csv" multiple webkitdirectory>
+        <div class="hint">Select the folder that contains the trade CSV files.</div>
+      </div>
+
+      <div class="control">
+        <label for="strategy">Strategy</label>
+        <select id="strategy">
+          <option value="all">All strategies</option>
+          <option value="put">Bull put spreads</option>
+          <option value="call">Bear call spreads</option>
+          <option value="iron">Iron condors</option>
+        </select>
+      </div>
+
+      <div class="control">
+        <label for="entryTime">Entry time</label>
+        <select id="entryTime">
+          <option value="all">All 26 entry times</option>
+          <option value="09:33">09:33</option>
+          <option value="09:45">09:45</option>
+          <option value="10:00">10:00</option>
+          <option value="10:15">10:15</option>
+          <option value="10:30">10:30</option>
+          <option value="10:45">10:45</option>
+          <option value="11:00">11:00</option>
+          <option value="11:15">11:15</option>
+          <option value="11:30">11:30</option>
+          <option value="11:45">11:45</option>
+          <option value="12:00">12:00</option>
+          <option value="12:15">12:15</option>
+          <option value="12:30">12:30</option>
+          <option value="12:45">12:45</option>
+          <option value="13:00">13:00</option>
+          <option value="13:15">13:15</option>
+          <option value="13:30">13:30</option>
+          <option value="13:45">13:45</option>
+          <option value="14:00">14:00</option>
+          <option value="14:15">14:15</option>
+          <option value="14:30">14:30</option>
+          <option value="14:45">14:45</option>
+          <option value="15:00">15:00</option>
+          <option value="15:15">15:15</option>
+          <option value="15:30">15:30</option>
+          <option value="15:45">15:45</option>
+        </select>
+      </div>
+
+      <div class="split">
+        <div class="control">
+          <label for="lookback">Lookback</label>
+          <select id="lookback">
+            <option value="all">All data</option>
+            <option value="30">30 days</option>
+            <option value="60">60 days</option>
+            <option value="90">90 days</option>
+            <option value="180">180 days</option>
+            <option value="365">1 year</option>
+            <option value="custom">Custom start</option>
+          </select>
+        </div>
+        <div class="control">
+          <label for="startDate">Start date</label>
+          <input id="startDate" type="date">
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="control">
+          <label for="minCredit">Min credit</label>
+          <input id="minCredit" type="number" step="0.05" min="0" placeholder="0.00">
+        </div>
+        <div class="control">
+          <label for="maxCredit">Max credit</label>
+          <input id="maxCredit" type="number" step="0.05" min="0" placeholder="No cap">
+        </div>
+      </div>
+
+      <div class="split">
+        <div class="control">
+          <label for="wingSize">Wing size</label>
+          <input id="wingSize" type="number" step="0.5" min="0" value="5">
+        </div>
+        <div class="control">
+          <label for="minTrades">Min trades</label>
+          <input id="minTrades" type="number" step="1" min="1" value="20">
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="bucketSize">Credit bucket</label>
+        <select id="bucketSize">
+          <option value="0.10">0.10</option>
+          <option value="0.25" selected>0.25</option>
+          <option value="0.50">0.50</option>
+          <option value="1.00">1.00</option>
+        </select>
+      </div>
+
+      <button id="refreshBtn" class="btn">Apply filters</button>
+      <div id="status" class="status">Waiting for a folder.</div>
+    </aside>
+
+    <main>
+      <div class="topline">
+        <div>
+          <h2>Strategy Profitability</h2>
+          <p id="rangeText">Select a CSV folder to compile trades.</p>
+        </div>
+        <span id="filePill" class="pill">0 files</span>
+      </div>
+
+      <section id="emptyState" class="empty">
+        Choose the folder containing your SPX backtest CSVs. The dashboard runs fully in this browser tab.
+      </section>
+
+      <section id="dashboard" style="display:none">
+        <div class="grid">
+          <div class="metric">
+            <div class="label">Net P/L</div>
+            <div id="netPl" class="value">$0.00</div>
+            <div id="netPlNote" class="note">After selected filters</div>
+          </div>
+          <div class="metric">
+            <div class="label">Trades</div>
+            <div id="tradeCount" class="value">0</div>
+            <div id="winRate" class="note">Win rate 0.0%</div>
+          </div>
+          <div class="metric">
+            <div class="label">Expectancy</div>
+            <div id="expectancy" class="value">$0.00</div>
+            <div id="profitFactor" class="note">Profit factor 0.00</div>
+          </div>
+          <div class="metric">
+            <div class="label">Max Drawdown</div>
+            <div id="maxDrawdown" class="value">$0.00</div>
+            <div id="bestStrategy" class="note">Best group pending</div>
+          </div>
+        </div>
+
+        <div class="panel-row">
+          <section class="panel">
+            <h2>Equity Curve</h2>
+            <div class="chart-wrap"><svg id="equityChart" role="img" aria-label="Equity curve"></svg></div>
+          </section>
+          <section class="panel">
+            <h2>Monthly P/L</h2>
+            <div class="chart-wrap"><svg id="monthlyChart" role="img" aria-label="Monthly profit and loss"></svg></div>
+          </section>
+        </div>
+
+        <section class="panel">
+          <h2>Profitable Setups</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Entry Time</th>
+                  <th>Credit Bucket</th>
+                  <th>Trades</th>
+                  <th>Win %</th>
+                  <th>Net P/L</th>
+                  <th>Avg P/L</th>
+                  <th>Profit Factor</th>
+                  <th>Max DD</th>
+                </tr>
+              </thead>
+              <tbody id="setupRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Strategy Summary</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Strategy</th>
+                  <th>Trades</th>
+                  <th>Win %</th>
+                  <th>Avg Credit</th>
+                  <th>Net P/L</th>
+                  <th>Avg P/L</th>
+                  <th>Profit Factor</th>
+                  <th>Max DD</th>
+                </tr>
+              </thead>
+              <tbody id="summaryRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Entry Time Summary</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Entry Time</th>
+                  <th>Strategy</th>
+                  <th>Trades</th>
+                  <th>Win %</th>
+                  <th>Avg Credit</th>
+                  <th>Net P/L</th>
+                  <th>Avg P/L</th>
+                  <th>Profit Factor</th>
+                  <th>Max DD</th>
+                </tr>
+              </thead>
+              <tbody id="entryTimeRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Recent Trades</h2>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Strategy</th>
+                  <th>Credit</th>
+                  <th>Width</th>
+                  <th>P/L</th>
+                  <th>Outcome</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="tradeRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const state = {
+      files: [],
+      rawRowCount: 0,
+      strategies: [],
+      widths: new Set(),
+      renderTimer: null,
+      isRendering: false
+    };
+
+    const el = (id) => document.getElementById(id);
+    const fmtMoney = (n) => (Number(n) || 0).toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+    const fmtNum = (n, d = 2) => (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+    const fmtPct = (n) => `${fmtNum((Number(n) || 0) * 100, 1)}%`;
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let field = "";
+      let quoted = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const ch = text[i];
+        const next = text[i + 1];
+
+        if (quoted) {
+          if (ch === '"' && next === '"') {
+            field += '"';
+            i += 1;
+          } else if (ch === '"') {
+            quoted = false;
+          } else {
+            field += ch;
+          }
+        } else if (ch === '"') {
+          quoted = true;
+        } else if (ch === ",") {
+          row.push(field);
+          field = "";
+        } else if (ch === "\n") {
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = "";
+        } else if (ch !== "\r") {
+          field += ch;
+        }
+      }
+
+      if (field.length || row.length) {
+        row.push(field);
+        rows.push(row);
+      }
+
+      if (!rows.length) return [];
+      const headers = rows.shift().map((h) => h.trim());
+      return rows
+        .filter((r) => r.some((v) => String(v || "").trim() !== ""))
+        .map((r) => Object.fromEntries(headers.map((h, i) => [h, r[i] ?? ""])));
+    }
+
+    function numberValue(value) {
+      const n = Number(String(value ?? "").replace(/[$,]/g, "").trim());
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function dateValue(row) {
+      const raw = row.EntryTime || `${row.OpenDate || ""} ${row.OpenTime || ""}`.trim();
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return d;
+      const open = new Date(row.OpenDate);
+      return Number.isNaN(open.getTime()) ? null : open;
+    }
+
+    function timeValue(row, date) {
+      const explicit = String(row.OpenTime || "").trim();
+      if (explicit) return explicit.slice(0, 5);
+      if (!date) return "";
+      const hh = String(date.getHours()).padStart(2, "0");
+      const mm = String(date.getMinutes()).padStart(2, "0");
+      return `${hh}:${mm}`;
+    }
+
+    function buildSpreads(rows) {
+      return rows.map((row, index) => {
+        const optionType = String(row.OptionType || "").toUpperCase().trim();
+        const date = dateValue(row);
+        const width = Math.abs(numberValue(row.Width) || (numberValue(row.LongStrike) - numberValue(row.ShortStrike)));
+        const premium = numberValue(row.Premium);
+        const pl = numberValue(row.ProfitLossAfterSlippage || row.ProfitLoss);
+        const strategy = optionType === "P" ? "Bull Put" : optionType === "C" ? "Bear Call" : "Unknown";
+        const source = row.__source || "";
+        return {
+          id: row.TradeID || `${source}:${index}`,
+          date,
+          dateKey: date ? date.toISOString().slice(0, 10) : "",
+          timeKey: timeValue(row, date),
+          optionType,
+          strategyType: optionType === "P" ? "put" : optionType === "C" ? "call" : "unknown",
+          strategy,
+          shortStrike: numberValue(row.ShortStrike),
+          longStrike: numberValue(row.LongStrike),
+          width,
+          premium,
+          pl,
+          outcome: row.Outcome || "",
+          source
+        };
+      }).filter((r) => r.date && r.strategyType !== "unknown");
+    }
+
+    function buildIronCondors(spreads) {
+      const groups = new Map();
+      for (const spread of spreads) {
+        const key = `${spread.dateKey}|${spread.timeKey}|${spread.width}|${spread.source}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(spread);
+      }
+
+      const condors = [];
+      for (const items of groups.values()) {
+        const puts = items.filter((x) => x.strategyType === "put");
+        const calls = items.filter((x) => x.strategyType === "call");
+        const count = Math.min(puts.length, calls.length);
+        for (let i = 0; i < count; i += 1) {
+          const put = puts[i];
+          const call = calls[i];
+          condors.push({
+            id: `IC:${put.id}:${call.id}`,
+            date: put.date <= call.date ? put.date : call.date,
+            dateKey: put.dateKey,
+            timeKey: put.timeKey,
+            strategyType: "iron",
+            strategy: "Iron Condor",
+            width: Math.max(put.width, call.width),
+            premium: put.premium + call.premium,
+            pl: put.pl + call.pl,
+            outcome: `${put.outcome || "Put"} / ${call.outcome || "Call"}`,
+            source: put.source === call.source ? put.source : `${put.source}; ${call.source}`
+          });
+        }
+      }
+      return condors;
+    }
+
+    function addSpreadsAndCondors(spreads, pendingCondorLegs) {
+      for (const spread of spreads) {
+        state.strategies.push(spread);
+        if (spread.width) state.widths.add(spread.width);
+        const key = `${spread.dateKey}|${spread.timeKey}|${spread.width}|${spread.source}`;
+        const oppositeType = spread.strategyType === "put" ? "call" : "put";
+        const sameType = spread.strategyType;
+        const oppositeKey = `${key}|${oppositeType}`;
+        const sameKey = `${key}|${sameType}`;
+        const oppositeQueue = pendingCondorLegs.get(oppositeKey);
+
+        if (oppositeQueue && oppositeQueue.length) {
+          const other = oppositeQueue.shift();
+          const put = spread.strategyType === "put" ? spread : other;
+          const call = spread.strategyType === "call" ? spread : other;
+          state.strategies.push({
+            id: `IC:${put.id}:${call.id}`,
+            date: put.date <= call.date ? put.date : call.date,
+            dateKey: put.dateKey,
+            timeKey: put.timeKey,
+            strategyType: "iron",
+            strategy: "Iron Condor",
+            width: Math.max(put.width, call.width),
+            premium: put.premium + call.premium,
+            pl: put.pl + call.pl,
+            outcome: `${put.outcome || "Put"} / ${call.outcome || "Call"}`,
+            source: put.source === call.source ? put.source : `${put.source}; ${call.source}`
+          });
+          if (Math.max(put.width, call.width)) state.widths.add(Math.max(put.width, call.width));
+        } else {
+          if (!pendingCondorLegs.has(sameKey)) pendingCondorLegs.set(sameKey, []);
+          pendingCondorLegs.get(sameKey).push(spread);
+        }
+      }
+    }
+
+    function currentFilters() {
+      return {
+        strategy: el("strategy").value,
+        entryTime: el("entryTime").value,
+        lookback: el("lookback").value,
+        startDate: el("startDate").value,
+        minCredit: numberOrNull(el("minCredit").value),
+        maxCredit: numberOrNull(el("maxCredit").value),
+        wingSize: numberValue(el("wingSize").value),
+        minTrades: Math.max(1, Math.round(numberValue(el("minTrades").value) || 1)),
+        bucketSize: numberValue(el("bucketSize").value) || 0.25
+      };
+    }
+
+    function numberOrNull(value) {
+      const s = String(value ?? "").trim();
+      if (!s) return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function filterTrades() {
+      const f = currentFilters();
+      if (f.wingSize > 0) {
+        let widthExists = false;
+        for (const width of state.widths) {
+          if (Math.abs(width - f.wingSize) <= 0.001) {
+            widthExists = true;
+            break;
+          }
+        }
+        if (!widthExists) return [];
+      }
+
+      let maxDate = new Date(0);
+      for (const trade of state.strategies) {
+        if (f.strategy === "iron" && trade.strategyType !== "iron") continue;
+        if (trade.date > maxDate) maxDate = trade.date;
+      }
+      let cutoff = null;
+
+      if (f.lookback === "custom" && f.startDate) {
+        cutoff = new Date(`${f.startDate}T00:00:00`);
+      } else if (f.lookback !== "all") {
+        cutoff = new Date(maxDate);
+        cutoff.setDate(cutoff.getDate() - Number(f.lookback) + 1);
+      }
+
+      return state.strategies.filter((trade) => {
+        if (f.strategy !== "all" && trade.strategyType !== f.strategy) return false;
+        if (f.entryTime !== "all" && trade.timeKey !== f.entryTime) return false;
+        if (cutoff && trade.date < cutoff) return false;
+        if (f.wingSize > 0 && Math.abs(trade.width - f.wingSize) > 0.001) return false;
+        if (f.minCredit !== null && trade.premium < f.minCredit) return false;
+        if (f.maxCredit !== null && trade.premium > f.maxCredit) return false;
+        return true;
+      }).sort((a, b) => a.date - b.date);
+    }
+
+    function stats(trades) {
+      const count = trades.length;
+      let wins = 0;
+      let net = 0;
+      let grossWin = 0;
+      let grossLoss = 0;
+      let creditTotal = 0;
+      let equity = 0;
+      let peak = 0;
+      let maxDd = 0;
+      const points = [];
+      for (const x of trades) {
+        if (x.pl > 0) {
+          wins += 1;
+          grossWin += x.pl;
+        } else if (x.pl < 0) {
+          grossLoss += Math.abs(x.pl);
+        }
+        net += x.pl;
+        creditTotal += x.premium;
+        equity += x.pl;
+        peak = Math.max(peak, equity);
+        maxDd = Math.max(maxDd, peak - equity);
+        const lastPoint = points[points.length - 1];
+        if (lastPoint && lastPoint.dateKey === x.dateKey) {
+          lastPoint.value = equity;
+        } else {
+          points.push({ date: x.date, dateKey: x.dateKey, value: equity });
+        }
+      }
+      return {
+        count,
+        wins,
+        winRate: count ? wins / count : 0,
+        net,
+        avg: count ? net / count : 0,
+        avgCredit: count ? creditTotal / count : 0,
+        profitFactor: grossLoss ? grossWin / grossLoss : grossWin ? Infinity : 0,
+        maxDd,
+        points
+      };
+    }
+
+    function groupedStats(trades, keyFn) {
+      const map = new Map();
+      for (const trade of trades) {
+        const key = keyFn(trade);
+        if (!map.has(key)) map.set(key, []);
+        map.get(key).push(trade);
+      }
+      const results = [];
+      for (const [key, items] of map.entries()) {
+        results.push({ key, items, ...stats(items) });
+      }
+      return results;
+    }
+
+    function bucketLabel(value, size) {
+      const start = Math.floor(value / size) * size;
+      const end = start + size;
+      return `${fmtNum(start, 2)}-${fmtNum(end, 2)}`;
+    }
+
+    function monthlyStats(trades) {
+      return groupedStats(trades, (x) => x.date.toISOString().slice(0, 7))
+        .sort((a, b) => a.key.localeCompare(b.key));
+    }
+
+    function render() {
+      const trades = filterTrades();
+      const s = stats(trades);
+      const first = trades[0]?.date;
+      const last = trades[trades.length - 1]?.date;
+
+      el("emptyState").style.display = state.files.length ? "none" : "block";
+      el("dashboard").style.display = state.files.length ? "block" : "none";
+      el("filePill").textContent = `${state.files.length} file${state.files.length === 1 ? "" : "s"}`;
+      el("rangeText").textContent = trades.length
+        ? `${first.toLocaleDateString()} to ${last.toLocaleDateString()} after filters`
+        : "No trades match the selected filters.";
+
+      el("netPl").textContent = fmtMoney(s.net);
+      el("netPl").className = `value ${s.net >= 0 ? "pos" : "neg"}`;
+      el("netPlNote").textContent = `${fmtMoney(s.avgCredit)} avg credit`;
+      el("tradeCount").textContent = s.count.toLocaleString();
+      el("winRate").textContent = `Win rate ${fmtPct(s.winRate)}`;
+      el("expectancy").textContent = fmtMoney(s.avg);
+      el("expectancy").className = `value ${s.avg >= 0 ? "pos" : "neg"}`;
+      el("profitFactor").textContent = `Profit factor ${s.profitFactor === Infinity ? "Inf" : fmtNum(s.profitFactor)}`;
+      el("maxDrawdown").textContent = fmtMoney(s.maxDd);
+
+      const summary = groupedStats(trades, (x) => x.strategy)
+        .sort((a, b) => b.avg - a.avg);
+      el("bestStrategy").textContent = summary[0] ? `Best: ${summary[0].key} ${fmtMoney(summary[0].avg)}/trade` : "Best group pending";
+
+      renderSummary(summary);
+      renderSetups(trades);
+      renderEntryTimeSummary(trades);
+      renderRecentTrades(trades);
+      renderEquity(el("equityChart"), s.points);
+      renderBars(el("monthlyChart"), monthlyStats(trades));
+      updateStatus(trades);
+    }
+
+    function updateStatus(trades) {
+      if (!state.files.length) {
+        el("status").textContent = "Waiting for a folder.";
+        return;
+      }
+      const width = currentFilters().wingSize;
+      const allWidths = Array.from(state.widths).sort((a, b) => a - b);
+      const widthNote = trades.length ? "" : ` Available widths: ${allWidths.slice(0, 10).join(", ")}${allWidths.length > 10 ? "..." : ""}.`;
+      el("status").textContent = `Loaded ${state.rawRowCount.toLocaleString()} CSV rows and built ${state.strategies.length.toLocaleString()} strategy records. Current wing filter is ${width}.${widthNote}`;
+    }
+
+    function renderSummary(groups) {
+      el("summaryRows").innerHTML = groups.map((g) => `
+        <tr>
+          <td>${escapeHtml(g.key)}</td>
+          <td>${g.count.toLocaleString()}</td>
+          <td>${fmtPct(g.winRate)}</td>
+          <td>${fmtMoney(g.avgCredit)}</td>
+          <td class="${g.net >= 0 ? "pos" : "neg"}">${fmtMoney(g.net)}</td>
+          <td class="${g.avg >= 0 ? "pos" : "neg"}">${fmtMoney(g.avg)}</td>
+          <td>${g.profitFactor === Infinity ? "Inf" : fmtNum(g.profitFactor)}</td>
+          <td>${fmtMoney(g.maxDd)}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="8">No matching trades.</td></tr>`;
+    }
+
+    function renderSetups(trades) {
+      const f = currentFilters();
+      const groups = groupedStats(trades, (x) => `${x.strategy}|${x.timeKey || "Unknown"}|${bucketLabel(x.premium, f.bucketSize)}`)
+        .filter((g) => g.count >= f.minTrades && g.avg > 0)
+        .sort((a, b) => b.avg - a.avg)
+        .slice(0, 40);
+
+      el("setupRows").innerHTML = groups.map((g) => {
+        const [strategy, entryTime, bucket] = g.key.split("|");
+        return `
+          <tr>
+            <td>${escapeHtml(strategy)}</td>
+            <td>${escapeHtml(entryTime)}</td>
+            <td>${escapeHtml(bucket)}</td>
+            <td>${g.count.toLocaleString()}</td>
+            <td>${fmtPct(g.winRate)}</td>
+            <td class="pos">${fmtMoney(g.net)}</td>
+            <td class="pos">${fmtMoney(g.avg)}</td>
+            <td>${g.profitFactor === Infinity ? "Inf" : fmtNum(g.profitFactor)}</td>
+            <td>${fmtMoney(g.maxDd)}</td>
+          </tr>
+        `;
+      }).join("") || `<tr><td colspan="9">No profitable setup meets the current minimum trade count.</td></tr>`;
+    }
+
+    function renderEntryTimeSummary(trades) {
+      const groups = groupedStats(trades, (x) => `${x.timeKey || "Unknown"}|${x.strategy}`)
+        .sort((a, b) => {
+          const [timeA] = a.key.split("|");
+          const [timeB] = b.key.split("|");
+          return timeA.localeCompare(timeB) || b.avg - a.avg;
+        });
+
+      el("entryTimeRows").innerHTML = groups.map((g) => {
+        const [entryTime, strategy] = g.key.split("|");
+        return `
+          <tr>
+            <td>${escapeHtml(entryTime)}</td>
+            <td>${escapeHtml(strategy)}</td>
+            <td>${g.count.toLocaleString()}</td>
+            <td>${fmtPct(g.winRate)}</td>
+            <td>${fmtMoney(g.avgCredit)}</td>
+            <td class="${g.net >= 0 ? "pos" : "neg"}">${fmtMoney(g.net)}</td>
+            <td class="${g.avg >= 0 ? "pos" : "neg"}">${fmtMoney(g.avg)}</td>
+            <td>${g.profitFactor === Infinity ? "Inf" : fmtNum(g.profitFactor)}</td>
+            <td>${fmtMoney(g.maxDd)}</td>
+          </tr>
+        `;
+      }).join("") || `<tr><td colspan="9">No matching trades.</td></tr>`;
+    }
+
+    function renderRecentTrades(trades) {
+      const rows = trades.slice(Math.max(0, trades.length - 100)).reverse();
+      el("tradeRows").innerHTML = rows.map((t) => `
+        <tr>
+          <td>${t.date.toLocaleString()}</td>
+          <td>${escapeHtml(t.timeKey)}</td>
+          <td>${escapeHtml(t.strategy)}</td>
+          <td>${fmtMoney(t.premium)}</td>
+          <td>${fmtNum(t.width, 1)}</td>
+          <td class="${t.pl >= 0 ? "pos" : "neg"}">${fmtMoney(t.pl)}</td>
+          <td>${escapeHtml(t.outcome)}</td>
+          <td>${escapeHtml(t.source)}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="8">No matching trades.</td></tr>`;
+    }
+
+    function renderEquity(svg, points) {
+      svg.innerHTML = "";
+      const w = 760;
+      const h = 260;
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      drawFrame(svg, w, h);
+      if (!points.length) return drawNoData(svg, w, h);
+
+      let min = 0;
+      let max = 0;
+      for (const point of points) {
+        if (point.value < min) min = point.value;
+        if (point.value > max) max = point.value;
+      }
+      const pad = (max - min || 1) * 0.08;
+      const yMin = min - pad;
+      const yMax = max + pad;
+      const x = (i) => 42 + (i / Math.max(1, points.length - 1)) * (w - 62);
+      const y = (v) => 18 + (1 - (v - yMin) / (yMax - yMin || 1)) * (h - 48);
+      const d = points.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+      const zeroY = y(0);
+      svg.appendChild(line(42, zeroY, w - 20, zeroY, "#cfd8df", 1));
+      svg.appendChild(path(d, "none", "#186d7a", 3));
+      addSvgText(svg, 44, 16, fmtMoney(yMax), "#64727f", 11);
+      addSvgText(svg, 44, h - 8, fmtMoney(yMin), "#64727f", 11);
+    }
+
+    function renderBars(svg, groups) {
+      svg.innerHTML = "";
+      const w = 760;
+      const h = 260;
+      svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      drawFrame(svg, w, h);
+      if (!groups.length) return drawNoData(svg, w, h);
+
+      let maxAbs = 1;
+      for (const group of groups) {
+        maxAbs = Math.max(maxAbs, Math.abs(group.net));
+      }
+      const zeroY = h / 2;
+      const barGap = 5;
+      const left = 42;
+      const barW = Math.max(6, (w - 66) / groups.length - barGap);
+      svg.appendChild(line(left, zeroY, w - 20, zeroY, "#cfd8df", 1));
+      groups.forEach((g, i) => {
+        const x = left + i * (barW + barGap);
+        const barH = (Math.abs(g.net) / maxAbs) * (h / 2 - 28);
+        const y = g.net >= 0 ? zeroY - barH : zeroY;
+        svg.appendChild(rect(x, y, barW, barH, g.net >= 0 ? "#177245" : "#b3261e"));
+        if (i % Math.ceil(groups.length / 8) === 0) addSvgText(svg, x, h - 8, g.key.slice(5), "#64727f", 10);
+      });
+      addSvgText(svg, 44, 16, fmtMoney(maxAbs), "#64727f", 11);
+      addSvgText(svg, 44, h - 8, fmtMoney(-maxAbs), "#64727f", 11);
+    }
+
+    function drawFrame(svg, w, h) {
+      svg.appendChild(rect(0, 0, w, h, "#fbfcfd"));
+      svg.appendChild(line(42, 16, 42, h - 22, "#d9e0e7", 1));
+      svg.appendChild(line(42, h - 22, w - 20, h - 22, "#d9e0e7", 1));
+    }
+
+    function drawNoData(svg, w, h) {
+      addSvgText(svg, w / 2, h / 2, "No matching data", "#64727f", 14, "middle");
+    }
+
+    function rect(x, y, width, height, fill) {
+      const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", y);
+      r.setAttribute("width", width);
+      r.setAttribute("height", Math.max(0, height));
+      r.setAttribute("fill", fill);
+      return r;
+    }
+
+    function line(x1, y1, x2, y2, stroke, width) {
+      const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      l.setAttribute("x1", x1);
+      l.setAttribute("y1", y1);
+      l.setAttribute("x2", x2);
+      l.setAttribute("y2", y2);
+      l.setAttribute("stroke", stroke);
+      l.setAttribute("stroke-width", width);
+      return l;
+    }
+
+    function path(d, fill, stroke, width) {
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", d);
+      p.setAttribute("fill", fill);
+      p.setAttribute("stroke", stroke);
+      p.setAttribute("stroke-width", width);
+      p.setAttribute("stroke-linejoin", "round");
+      p.setAttribute("stroke-linecap", "round");
+      return p;
+    }
+
+    function addSvgText(svg, x, y, text, fill, size, anchor = "start") {
+      const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      t.setAttribute("x", x);
+      t.setAttribute("y", y);
+      t.setAttribute("fill", fill);
+      t.setAttribute("font-size", size);
+      t.setAttribute("font-family", "Inter, system-ui, sans-serif");
+      t.setAttribute("text-anchor", anchor);
+      t.textContent = text;
+      svg.appendChild(t);
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, (ch) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;"
+      }[ch]));
+    }
+
+    async function loadFiles(fileList) {
+      const files = Array.from(fileList).filter((file) => file.name.toLowerCase().endsWith(".csv"));
+      state.files = files;
+      state.rawRowCount = 0;
+      state.strategies = [];
+      state.widths = new Set();
+      el("status").textContent = `Reading ${files.length} CSV file${files.length === 1 ? "" : "s"}...`;
+      const pendingCondorLegs = new Map();
+
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+        const file = files[fileIndex];
+        el("status").textContent = `Reading ${fileIndex + 1} of ${files.length}: ${file.name}`;
+        const text = await file.text();
+        const rows = parseCsv(text);
+        const source = file.webkitRelativePath || file.name;
+        state.rawRowCount += rows.length;
+        const fileRows = [];
+        for (const row of rows) {
+          row.__source = source;
+          fileRows.push(row);
+        }
+        const fileSpreads = buildSpreads(fileRows);
+        addSpreadsAndCondors(fileSpreads, pendingCondorLegs);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      safeRender();
+    }
+
+    function setApplyBusy(isBusy) {
+      state.isRendering = isBusy;
+      const button = el("refreshBtn");
+      button.disabled = isBusy;
+      button.textContent = isBusy ? "Working..." : "Apply filters";
+      button.style.opacity = isBusy ? "0.72" : "1";
+      button.style.cursor = isBusy ? "wait" : "pointer";
+    }
+
+    function safeRender() {
+      if (state.isRendering) return;
+      if (state.renderTimer) clearTimeout(state.renderTimer);
+      el("status").textContent = state.files.length
+        ? "Applying filters. Large folders can take a moment..."
+        : "Waiting for a folder.";
+      setApplyBusy(true);
+
+      state.renderTimer = setTimeout(() => {
+        try {
+          render();
+        } catch (error) {
+          console.error(error);
+          el("status").textContent = `Dashboard render failed: ${error.message}`;
+        } finally {
+          setApplyBusy(false);
+          state.renderTimer = null;
+        }
+      }, 25);
+    }
+
+    function markFiltersChanged() {
+      if (!state.files.length) return;
+      el("status").textContent = "Filters changed. Click Apply filters to update the dashboard.";
+    }
+
+    el("folderInput").addEventListener("change", (event) => {
+      loadFiles(event.target.files).catch((error) => {
+        console.error(error);
+        el("status").textContent = `Could not read folder: ${error.message}`;
+      });
+    });
+
+    ["strategy", "entryTime", "lookback", "startDate", "minCredit", "maxCredit", "wingSize", "minTrades", "bucketSize"].forEach((id) => {
+      el(id).addEventListener("input", markFiltersChanged);
+      el(id).addEventListener("change", markFiltersChanged);
+    });
+
+    el("refreshBtn").addEventListener("click", safeRender);
+    safeRender();
+  </script>
+</body>
+</html>
