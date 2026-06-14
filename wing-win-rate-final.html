@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX Win Rate — Wing × Credit Analysis</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+  :root {
+    --bg:       #0d1117;
+    --surface:  #161b22;
+    --border:   #21262d;
+    --text:     #e6edf3;
+    --muted:    #7d8590;
+    --accent:   #58a6ff;
+
+    /* heat scale: deep loss → neutral → strong win */
+    --c0: #1a0a0a;
+    --c1: #3d1a1a;
+    --c2: #6b2f2f;
+    --c3: #8b3a3a;
+    --c4: #a84949;
+    --c5: #b8722a;
+    --c6: #c9912c;
+    --c7: #7fb069;
+    --c8: #4a9040;
+    --c9: #2d7a2d;
+    --c10:#1a5c1a;
+
+    --put-accent:  #4fc3f7;
+    --call-accent: #f06292;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* ── Header ─────────────────────────────── */
+  header {
+    padding: 40px 48px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+  }
+  h1 strong { font-weight: 600; }
+  .subtitle {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .pill {
+    display: inline-block;
+    background: #1f2937;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    margin-left: 8px;
+  }
+
+  /* ── Layout ─────────────────────────────── */
+  main {
+    padding: 32px 48px 64px;
+    display: grid;
+    gap: 40px;
+  }
+
+  /* ── Section label ───────────────────────── */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .strategy-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 3px 10px;
+    border-radius: 4px;
+  }
+  .tag-put  { background: rgba(79,195,247,0.15); color: var(--put-accent);  border: 1px solid rgba(79,195,247,0.3); }
+  .tag-call { background: rgba(240,98,146,0.15); color: var(--call-accent); border: 1px solid rgba(240,98,146,0.3); }
+  .section-desc { color: var(--muted); font-size: 13px; }
+
+  /* ── Heatmap table ───────────────────────── */
+  .table-wrap { overflow-x: auto; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 580px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  thead th {
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    white-space: nowrap;
+  }
+  thead th.row-label { text-align: left; }
+  tbody tr:hover td { filter: brightness(1.18); }
+  td {
+    padding: 9px 14px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(33,38,45,0.6);
+    transition: filter 0.12s;
+    letter-spacing: 0.02em;
+  }
+  td.row-label {
+    text-align: left;
+    font-weight: 400;
+    color: var(--muted);
+    background: var(--surface) !important;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    padding-right: 20px;
+  }
+
+  /* ── Legend ──────────────────────────────── */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .legend-bar {
+    display: flex;
+    gap: 2px;
+    height: 10px;
+  }
+  .legend-bar span {
+    display: inline-block;
+    width: 22px;
+    height: 10px;
+    border-radius: 2px;
+  }
+  .legend-label { color: var(--muted); font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
+
+  /* ── Comparison charts ───────────────────── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 860px) {
+    .charts-grid { grid-template-columns: 1fr; }
+    header, main { padding-left: 20px; padding-right: 20px; }
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 20px 12px;
+  }
+  .chart-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+  canvas { width: 100% !important; }
+
+  /* ── Stats strip ─────────────────────────── */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 700px) { .stats-strip { grid-template-columns: repeat(2, 1fr); } }
+  .stat-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+  .stat-val   { font-family: 'IBM Plex Mono', monospace; font-size: 22px; font-weight: 600; }
+  .stat-val.put  { color: var(--put-accent); }
+  .stat-val.call { color: var(--call-accent); }
+  .stat-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Footer ──────────────────────────────── */
+  footer {
+    padding: 20px 48px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  footer span::before { content: '▸ '; color: var(--accent); }
+
+  /* ── Section divider ─────────────────────── */
+  .section-divider { display:flex; align-items:center; gap:16px; padding:8px 0 0; }
+  .section-divider-line { flex:1; height:1px; background:var(--border); }
+  .section-divider-label { font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.12em; color:var(--muted); text-transform:uppercase; white-space:nowrap; }
+
+  /* ── EV tabs ─────────────────────────────── */
+  .ev-tabs { display:flex; gap:8px; margin-bottom:20px; }
+  .ev-tab { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; padding:5px 14px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .ev-tab:hover { color:var(--text); border-color:#444c56; }
+  .ev-tab.active-put  { background:rgba(79,195,247,.12); color:var(--put-accent);  border-color:rgba(79,195,247,.3); }
+  .ev-tab.active-call { background:rgba(240,98,146,.12); color:var(--call-accent); border-color:rgba(240,98,146,.3); }
+  .ev-tab.active-both { background:rgba(88,166,255,.12); color:var(--accent);      border-color:rgba(88,166,255,.3); }
+
+  /* ── EV stats ────────────────────────────── */
+  .ev-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+  @media(max-width:700px){ .ev-stats{ grid-template-columns:repeat(2,1fr); } }
+
+  /* ── EV table cells ──────────────────────── */
+  td.ev-cell { font-size:12px; padding:8px 10px; }
+  .ev-neg  { color:#ff7b7b; }
+  .ev-warn { color:#ffa657; }
+  .ev-ok   { color:#7ee787; }
+  .ev-best { color:#39d353; font-weight:700; }
+  .star    { font-size:9px; vertical-align:super; margin-left:1px; color:#ffd700; }
+
+  /* ── EV note ─────────────────────────────── */
+  .ev-note { background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:4px; padding:10px 14px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--muted); line-height:1.8; }
+  .ev-note strong { color:var(--text); }
+
+  /* ── Positive Expectancy ─────────────────── */
+  .pe-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  @media(max-width:700px){ .pe-grid{ grid-template-columns:repeat(2,1fr); } }
+  .pe-val-put  { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; color:var(--put-accent); }
+  .pe-val-call { font-family:'IBM Plex Mono',monospace; font-size:22px; font-weight:600; color:var(--call-accent); }
+  td.pe-cell   { font-size:12px; padding:8px 10px; font-family:'IBM Plex Mono',monospace; }
+  .pe-neg  { color:#ff7b7b; }
+  .pe-low  { color:#ffa657; }
+  .pe-mid  { color:#7ee787; }
+  .pe-high { color:#39d353; font-weight:700; }
+  .pe-tabs { display:flex; gap:8px; margin-bottom:20px; }
+  .pe-tab  { font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:.06em; padding:5px 14px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--muted); cursor:pointer; transition:all .15s; }
+  .pe-tab:hover { color:var(--text); border-color:#444c56; }
+  .pe-tab.active-put  { background:rgba(79,195,247,.12);  color:var(--put-accent);  border-color:rgba(79,195,247,.3); }
+  .pe-tab.active-call { background:rgba(240,98,146,.12); color:var(--call-accent); border-color:rgba(240,98,146,.3); }
+  .pe-tab.active-both { background:rgba(88,166,255,.12);  color:var(--accent);      border-color:rgba(88,166,255,.3); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">SPX 0DTE Options · Backtest Analysis</div>
+  <h1><strong>Win Rate</strong> by Wing Size &amp; Premium</h1>
+  <div class="subtitle">
+    Bull Put Spread &amp; Bear Call Spread
+    <span class="pill">Jan 2025 – May 2026</span>
+    <span class="pill">Stop Loss = 2× Credit</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Stats strip ── -->
+  <div class="stats-strip" id="stats-strip">
+    <div class="stat-box">
+      <div class="stat-label">Bull Put · Peak Win Rate</div>
+      <div class="stat-val put" id="put-max">—</div>
+      <div class="stat-note" id="put-max-note">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Bull Put · Low Win Rate</div>
+      <div class="stat-val put" id="put-min">—</div>
+      <div class="stat-note" id="put-min-note">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Bear Call · Peak Win Rate</div>
+      <div class="stat-val call" id="call-max">—</div>
+      <div class="stat-note" id="call-max-note">—</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Bear Call · Low Win Rate</div>
+      <div class="stat-val call" id="call-min">—</div>
+      <div class="stat-note" id="call-min-note">—</div>
+    </div>
+  </div>
+
+  <!-- ── Bull Put heatmap ── -->
+  <section>
+    <div class="section-label">
+      <span class="strategy-tag tag-put">Bull Put Spread</span>
+      <span class="section-desc">Win rate (%) by wing width (pts) and credit collected ($)</span>
+    </div>
+    <div class="table-wrap">
+      <table id="put-table"></table>
+    </div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- ── Bear Call heatmap ── -->
+  <section>
+    <div class="section-label">
+      <span class="strategy-tag tag-call">Bear Call Spread</span>
+      <span class="section-desc">Win rate (%) by wing width (pts) and credit collected ($)</span>
+    </div>
+    <div class="table-wrap">
+      <table id="call-table"></table>
+    </div>
+  </section>
+
+  <!-- ── Charts ── -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Win Rate vs Wing Size (avg across credits)</div>
+      <canvas id="chart-wing"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Win Rate vs Credit (avg across wing sizes)</div>
+      <canvas id="chart-credit"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bull Put — Win Rate by Credit · Selected Wings</div>
+      <canvas id="chart-put-lines"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bear Call — Win Rate by Credit · Selected Wings</div>
+      <canvas id="chart-call-lines"></canvas>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- ── SECTION 2: Expected Value Analysis ─── -->
+  <!-- ═══════════════════════════════════════════ -->
+
+  <div class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">Expected Value Analysis</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <!-- EV formula note -->
+  <div class="ev-note">
+    <strong>EV = C × (3W − 2)</strong> &nbsp;where W = win rate, C = credit collected · Stop loss = 2× credit means: win → +C, lose → −2C
+    &nbsp;·&nbsp; <strong>Break-even: W &gt; 66.7%</strong> &nbsp;·&nbsp; Cells below break-even shown in red
+  </div>
+
+  <!-- EV view tabs -->
+  <div>
+    <div class="ev-tabs">
+      <button class="ev-tab" id="tab-put"  onclick="setEVMode('put')">Bull Put</button>
+      <button class="ev-tab"            id="tab-call" onclick="setEVMode('call')">Bear Call</button>
+      <button class="ev-tab active-both" id="tab-both" onclick="setEVMode('both')">Side by Side</button>
+    </div>
+
+    <!-- EV Stats -->
+    <div class="ev-stats" id="ev-stats"></div>
+
+    <!-- EV Heatmap -->
+    <div class="section-label">
+      <span class="section-desc" id="ev-table-label">EV per trade ($) — Bull Put</span>
+    </div>
+    <div class="table-wrap">
+      <table id="ev-table"></table>
+    </div>
+  </div>
+
+  <!-- EV Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Avg EV vs Wing Size</div>
+      <canvas id="ev-chart-wing" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg EV vs Credit Collected</div>
+      <canvas id="ev-chart-credit" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bull Put EV by Credit — Selected Wings</div>
+      <canvas id="ev-chart-put-lines" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bear Call EV by Credit — Selected Wings</div>
+      <canvas id="ev-chart-call-lines" style="height:220px"></canvas>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- ── SECTION 3: Positive Expectancy ─────── -->
+  <!-- ═══════════════════════════════════════════ -->
+
+  <div class="section-divider">
+    <div class="section-divider-line"></div>
+    <div class="section-divider-label">Positive Expectancy</div>
+    <div class="section-divider-line"></div>
+  </div>
+
+  <div class="ev-note">
+    <strong>Positive Expectancy (PE) = EV / Max Loss = (3W − 2) / 2</strong> &nbsp;·&nbsp;
+    Measures edge as a fraction of capital risked per trade &nbsp;·&nbsp;
+    PE &gt; 0 = profitable system &nbsp;·&nbsp; PE = 0.10 means you earn $0.10 for every $1.00 at risk
+  </div>
+
+  <!-- PE Stats -->
+  <div class="pe-grid" id="pe-stats"></div>
+
+  <!-- PE view tabs -->
+  <div class="pe-tabs">
+    <button class="pe-tab" id="pe-tab-put"  onclick="setPEMode('put')">Bull Put</button>
+    <button class="pe-tab" id="pe-tab-call" onclick="setPEMode('call')">Bear Call</button>
+    <button class="pe-tab active-both" id="pe-tab-both" onclick="setPEMode('both')">Side by Side</button>
+  </div>
+
+  <div class="section-label">
+    <span class="section-desc" id="pe-table-label">PE per combo — Bull Put (top) / Bear Call (bottom)</span>
+  </div>
+  <div class="table-wrap">
+    <table id="pe-table"></table>
+  </div>
+
+  <!-- PE Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Avg PE vs Wing Size</div>
+      <canvas id="pe-chart-wing" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Avg PE vs Credit Collected</div>
+      <canvas id="pe-chart-credit" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bull Put PE by Credit — Selected Wings</div>
+      <canvas id="pe-chart-put-lines" style="height:220px"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Bear Call PE by Credit — Selected Wings</div>
+      <canvas id="pe-chart-call-lines" style="height:220px"></canvas>
+    </div>
+  </div>
+
+
+</main>
+
+<footer>
+  <span>Backtest period: Jan 1 2025 – May 1 2026</span>
+  <span>Stop loss fixed at 2× credit collected</span>
+  <span>Wing size in SPX points (10–55)</span>
+  <span>Credit in USD per contract (0.50–3.00)</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ── Data ──────────────────────────────────────────────────────────────
+const credits  = [0.50, 0.75, 1.00, 1.50, 2.00, 2.50, 3.00];
+const wings    = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+const putData = [
+  [66.28, 65.33, 64.99, 59.74, 50.59, 41.16, 32.46],
+  [67.83, 67.11, 67.30, 63.10, 61.10, 60.40, 56.60],
+  [68.59, 68.43, 68.50, 66.20, 64.50, 63.20, 61.60],
+  [69.19, 68.61, 69.40, 69.30, 66.80, 65.50, 63.60],
+  [69.88, 68.80, 70.30, 69.10, 68.20, 66.80, 65.70],
+  [70.41, 70.41, 70.10, 70.20, 68.10, 67.40, 66.60],
+  [71.13, 69.67, 70.30, 70.30, 69.40, 68.50, 67.10],
+  [71.78, 70.01, 70.50, 70.80, 69.80, 69.00, 68.10],
+  [72.21, 70.43, 70.90, 71.00, 69.90, 69.90, 68.20],
+  [72.48, 70.93, 71.10, 71.30, 69.90, 69.50, 68.60],
+  [72.68, 71.08, 71.50, 71.10, 70.00, 69.50, 69.10],
+];
+
+const callData = [
+  [65.61, 64.44, 63.76, 60.09, 51.05, 43.20, 34.44],
+  [66.88, 65.43, 65.30, 64.40, 63.90, 62.30, 58.40],
+  [67.31, 65.95, 66.40, 65.50, 64.80, 65.60, 64.00],
+  [68.55, 67.06, 67.60, 66.90, 66.80, 66.10, 65.60],
+  [69.30, 67.92, 68.10, 67.20, 67.20, 66.90, 66.80],
+  [70.02, 68.49, 68.40, 68.10, 67.90, 67.50, 67.90],
+  [70.44, 68.67, 68.10, 68.40, 68.00, 68.20, 68.00],
+  [70.71, 68.92, 68.50, 68.60, 68.50, 67.80, 67.80],
+  [71.27, 69.34, 68.60, 69.00, 68.70, 68.10, 68.20],
+  [71.74, 69.67, 69.30, 69.30, 69.10, 68.50, 68.20],
+  [71.98, 69.95, 68.80, 69.20, 69.30, 68.70, 68.50],
+];
+
+// ── Color scale ───────────────────────────────────────────────────────
+function winColor(v, min, max) {
+  const t = (v - min) / (max - min);
+  // dark red → amber → green
+  const stops = [
+    [26,10,10],    // 0%
+    [61,26,26],    // 14%
+    [107,47,47],   // 28%
+    [184,114,42],  // 42%
+    [201,145,44],  // 57%
+    [127,176,105], // 71%
+    [74,144,64],   // 85%
+    [26,92,26],    // 100%
+  ];
+  const idx = t * (stops.length - 1);
+  const lo  = Math.floor(idx);
+  const hi  = Math.min(lo + 1, stops.length - 1);
+  const f   = idx - lo;
+  const r   = stops[lo][0] + f * (stops[hi][0] - stops[lo][0]);
+  const g   = stops[lo][1] + f * (stops[hi][1] - stops[lo][1]);
+  const b   = stops[lo][2] + f * (stops[hi][2] - stops[lo][2]);
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+function textColor(bg) {
+  const m = bg.match(/\d+/g).map(Number);
+  const lum = 0.299*m[0] + 0.587*m[1] + 0.114*m[2];
+  return lum > 100 ? '#111' : '#e6edf3';
+}
+
+// ── Find global min/max ───────────────────────────────────────────────
+const allVals = [...putData.flat(), ...callData.flat()];
+const gMin = Math.min(...allVals);
+const gMax = Math.max(...allVals);
+
+// ── Build heatmap table ───────────────────────────────────────────────
+function buildTable(tableId, data, accentClass) {
+  const table = document.getElementById(tableId);
+
+  // thead
+  const thead = table.createTHead();
+  const hr = thead.insertRow();
+  const th0 = document.createElement('th');
+  th0.className = 'row-label';
+  th0.textContent = 'Wing (pts) ↓  Credit ($) →';
+  hr.appendChild(th0);
+  credits.forEach(c => {
+    const th = document.createElement('th');
+    th.textContent = `$${c.toFixed(2)}`;
+    hr.appendChild(th);
+  });
+
+  // tbody
+  const tbody = table.createTBody();
+  data.forEach((row, ri) => {
+    const tr = tbody.insertRow();
+    const td0 = tr.insertCell();
+    td0.className = 'row-label';
+    td0.textContent = `${wings[ri]} pts`;
+    row.forEach(v => {
+      const td = tr.insertCell();
+      const bg = winColor(v, gMin, gMax);
+      td.style.background = bg;
+      td.style.color = textColor(bg);
+      td.textContent = v.toFixed(1) + '%';
+    });
+  });
+}
+
+buildTable('put-table',  putData,  'put');
+buildTable('call-table', callData, 'call');
+
+// ── Legend ────────────────────────────────────────────────────────────
+const legend = document.getElementById('legend');
+const bar = document.createElement('div'); bar.className = 'legend-bar';
+for (let i = 0; i <= 10; i++) {
+  const s = document.createElement('span');
+  const v = gMin + (i / 10) * (gMax - gMin);
+  s.style.background = winColor(v, gMin, gMax);
+  bar.appendChild(s);
+}
+const l1 = document.createElement('span'); l1.className = 'legend-label'; l1.style.marginRight='4px'; l1.textContent = `${gMin.toFixed(1)}%`;
+const l2 = document.createElement('span'); l2.className = 'legend-label'; l2.style.marginLeft='4px';  l2.textContent = `${gMax.toFixed(1)}%`;
+legend.appendChild(l1);
+legend.appendChild(bar);
+legend.appendChild(l2);
+
+// ── Stats ─────────────────────────────────────────────────────────────
+function statsFor(data, prefix, maxId, minId, maxNoteId, minNoteId) {
+  let maxV = -Infinity, minV = Infinity;
+  let maxW, maxC, minW, minC;
+  data.forEach((row, ri) => row.forEach((v, ci) => {
+    if (v > maxV) { maxV = v; maxW = wings[ri]; maxC = credits[ci]; }
+    if (v < minV) { minV = v; minW = wings[ri]; minC = credits[ci]; }
+  }));
+  document.getElementById(maxId).textContent = maxV.toFixed(1) + '%';
+  document.getElementById(minId).textContent = minV.toFixed(1) + '%';
+  document.getElementById(maxNoteId).textContent = `Wing ${maxW}pts · $${maxC.toFixed(2)} credit`;
+  document.getElementById(minNoteId).textContent = `Wing ${minW}pts · $${minC.toFixed(2)} credit`;
+}
+statsFor(putData,  'put',  'put-max',  'put-min',  'put-max-note',  'put-min-note');
+statsFor(callData, 'call', 'call-max', 'call-min', 'call-max-note', 'call-min-note');
+
+// ── Chart.js defaults ─────────────────────────────────────────────────
+Chart.defaults.color = '#7d8590';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size   = 11;
+
+const gridOpts = {
+  color: 'rgba(33,38,45,0.9)',
+  borderColor: 'rgba(33,38,45,0)',
+};
+const tickOpts = { color: '#7d8590' };
+
+function avgRow(data) { return data.map(row => row.reduce((a,b)=>a+b,0)/row.length); }
+function avgCol(data) {
+  return credits.map((_, ci) => data.reduce((a, row) => a + row[ci], 0) / data.length);
+}
+
+// Chart 1: Win rate vs wing size
+new Chart(document.getElementById('chart-wing'), {
+  type: 'line',
+  data: {
+    labels: wings.map(w => w + 'pts'),
+    datasets: [
+      {
+        label: 'Bull Put',
+        data: avgRow(putData),
+        borderColor: '#4fc3f7',
+        backgroundColor: 'rgba(79,195,247,0.08)',
+        tension: 0.3, pointRadius: 4, fill: true,
+      },
+      {
+        label: 'Bear Call',
+        data: avgRow(callData),
+        borderColor: '#f06292',
+        backgroundColor: 'rgba(240,98,146,0.08)',
+        tension: 0.3, pointRadius: 4, fill: true,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#7d8590', boxWidth: 12 } } },
+    scales: {
+      x: { grid: gridOpts, ticks: tickOpts },
+      y: { grid: gridOpts, ticks: tickOpts, min: 55, max: 75,
+           title: { display: true, text: 'Win Rate (%)', color: '#7d8590' } },
+    },
+  },
+});
+
+// Chart 2: Win rate vs credit
+new Chart(document.getElementById('chart-credit'), {
+  type: 'line',
+  data: {
+    labels: credits.map(c => '$'+c.toFixed(2)),
+    datasets: [
+      {
+        label: 'Bull Put',
+        data: avgCol(putData),
+        borderColor: '#4fc3f7',
+        backgroundColor: 'rgba(79,195,247,0.08)',
+        tension: 0.3, pointRadius: 4, fill: true,
+      },
+      {
+        label: 'Bear Call',
+        data: avgCol(callData),
+        borderColor: '#f06292',
+        backgroundColor: 'rgba(240,98,146,0.08)',
+        tension: 0.3, pointRadius: 4, fill: true,
+      },
+    ],
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { labels: { color: '#7d8590', boxWidth: 12 } } },
+    scales: {
+      x: { grid: gridOpts, ticks: tickOpts },
+      y: { grid: gridOpts, ticks: tickOpts, min: 55, max: 75,
+           title: { display: true, text: 'Win Rate (%)', color: '#7d8590' } },
+    },
+  },
+});
+
+// Charts 3 & 4: line per selected wing
+const selectedWings = [0, 1, 3, 5, 10]; // indices → 5, 10, 20, 30, 55 pts
+const wingColors = ['#58a6ff','#3fb950','#d2a679','#a5d6ff','#ffa657'];
+
+function makeLinesChart(canvasId, data, accentBase) {
+  new Chart(document.getElementById(canvasId), {
+    type: 'line',
+    data: {
+      labels: credits.map(c => '$'+c.toFixed(2)),
+      datasets: selectedWings.map((wi, i) => ({
+        label: `${wings[wi]}pts wing`,
+        data: data[wi],
+        borderColor: wingColors[i],
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        pointRadius: 3,
+      })),
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#7d8590', boxWidth: 12 } } },
+      scales: {
+        x: { grid: gridOpts, ticks: tickOpts },
+        y: { grid: gridOpts, ticks: tickOpts, min: 54, max: 75,
+             title: { display: true, text: 'Win Rate (%)', color: '#7d8590' } },
+      },
+    },
+  });
+}
+
+makeLinesChart('chart-put-lines',  putData,  '#4fc3f7');
+makeLinesChart('chart-call-lines', callData, '#f06292');
+
+// ── EV SECTION ────────────────────────────────────────────────────────
+
+function calcEV(w, c) { return +(c * (3*(w/100) - 2)).toFixed(3); }
+
+// ── Utility ───────────────────────────────────────────────────────────
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+const putEV  = putData.map(row  => row.map((w,ci)  => calcEV(w,  credits[ci])));
+const callEV = callData.map(row => row.map((w,ci)  => calcEV(w,  credits[ci])));
+
+function evClass(v) {
+  if (v < 0)    return 'ev-neg';
+  if (v < 0.05) return 'ev-warn';
+  if (v < 0.15) return 'ev-ok';
+  return 'ev-best';
+}
+
+function maxEVCell(evArr) {
+  let best = { val: -Infinity, wi: -1, ci: -1 };
+  evArr.forEach((row,ri) => row.forEach((v,ci) => { if (v > best.val) best = {val:v,wi:ri,ci:ci}; }));
+  return best;
+}
+
+let evMode = 'both';
+let evCharts = {};
+
+function setEVMode(m) {
+  evMode = m;
+  ['put','call','both'].forEach(k => {
+    const el = document.getElementById('tab-'+k);
+    el.className = 'ev-tab' + (k===m ? ' active-'+m : '');
+  });
+  renderEVStats();
+  renderEVTable();
+  renderEVCharts();
+}
+
+function renderEVStats() {
+  const bp = maxEVCell(putEV), bc = maxEVCell(callEV);
+  const allPut  = putEV.flat(),  allCall = callEV.flat();
+  const avgP = (allPut.reduce((a,b)=>a+b,0)/allPut.length).toFixed(3);
+  const avgC = (allCall.reduce((a,b)=>a+b,0)/allCall.length).toFixed(3);
+  const negP = allPut.filter(v=>v<0).length, negC = allCall.filter(v=>v<0).length;
+  document.getElementById('ev-stats').innerHTML = `
+    <div class="stat-box">
+      <div class="stat-label">Best Bull Put EV</div>
+      <div class="stat-val put">$${bp.val.toFixed(2)}</div>
+      <div class="stat-note">${wings[bp.wi]}pt wing · $${credits[bp.ci].toFixed(2)} credit</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Best Bear Call EV</div>
+      <div class="stat-val call">$${bc.val.toFixed(2)}</div>
+      <div class="stat-note">${wings[bc.wi]}pt wing · $${credits[bc.ci].toFixed(2)} credit</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Avg EV / Trade</div>
+      <div class="stat-val" style="color:var(--put-accent);font-size:16px">P: $${avgP}</div>
+      <div class="stat-note" style="color:var(--call-accent)">C: $${avgC}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Negative EV Cells</div>
+      <div class="stat-val" style="color:#ff7b7b;font-size:18px">${negP}P / ${negC}C</div>
+      <div class="stat-note">of ${allPut.length} combos each</div>
+    </div>
+  `;
+}
+
+function renderEVTable() {
+  const showPut  = evMode !== 'call';
+  const showCall = evMode !== 'put';
+  const bp = maxEVCell(putEV), bc = maxEVCell(callEV);
+
+  document.getElementById('ev-table-label').textContent =
+    evMode === 'put'  ? 'EV per trade ($) — Bull Put' :
+    evMode === 'call' ? 'EV per trade ($) — Bear Call' :
+                        'EV per trade ($) — Bull Put (top) / Bear Call (bottom)';
+
+  let html = '<thead><tr><th class="row-label">Wing ↓  Credit →</th>';
+  credits.forEach(c => { html += `<th>$${c.toFixed(2)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  wings.forEach((w, ri) => {
+    html += `<tr><td class="row-label">${w} pts</td>`;
+    credits.forEach((c, ci) => {
+      if (showPut && showCall) {
+        const pv = putEV[ri][ci], cv = callEV[ri][ci];
+        const pStar = (ri===bp.wi && ci===bp.ci) ? '<span class="star">★</span>' : '';
+        const cStar = (ri===bc.wi && ci===bc.ci) ? '<span class="star">★</span>' : '';
+        html += `<td class="ev-cell">`;
+        html += `<span class="${evClass(pv)}">${pv>=0?'+':''}${pv.toFixed(2)}${pStar}</span>`;
+        html += `<br><span class="${evClass(cv)}" style="font-size:11px;opacity:0.8">${cv>=0?'+':''}${cv.toFixed(2)}${cStar}</span>`;
+        html += `</td>`;
+      } else {
+        const arr = showPut ? putEV : callEV;
+        const bestCell = showPut ? bp : bc;
+        const v = arr[ri][ci];
+        const star = (ri===bestCell.wi && ci===bestCell.ci) ? '<span class="star">★</span>' : '';
+        html += `<td class="ev-cell ${evClass(v)}">${v>=0?'+':''}${v.toFixed(2)}${star}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('ev-table').innerHTML = html;
+}
+
+function avgRowArr(arr) { return arr.map(row => +(row.reduce((a,b)=>a+b,0)/row.length).toFixed(4)); }
+function avgColArr(arr) {
+  return credits.map((_,ci) => +(arr.reduce((a,row)=>a+row[ci],0)/arr.length).toFixed(4));
+}
+
+function renderEVCharts() {
+  Object.values(evCharts).forEach(c => c.destroy());
+  evCharts = {};
+
+  const wingLabels   = wings.map(w => w+'pts');
+  const creditLabels = credits.map(c => '$'+c.toFixed(2));
+
+
+  const makeDS = (label, data, color, dash=[]) => ({
+    label, data,
+    borderColor: color,
+    backgroundColor: hexToRgba(color, 0.08),
+    tension: 0.3, pointRadius: 4, fill: true,
+    borderDash: dash,
+  });
+
+  // Chart A: avg EV by wing
+  const dsWing = [];
+  if (evMode !== 'call') dsWing.push(makeDS('Bull Put',  avgRowArr(putEV),  '#4fc3f7'));
+  if (evMode !== 'put')  dsWing.push(makeDS('Bear Call', avgRowArr(callEV), '#f06292', [4,3]));
+  evCharts['w'] = new Chart(document.getElementById('ev-chart-wing'), {
+    type:'line', data:{labels:wingLabels,datasets:dsWing},
+    options:{responsive:true,
+      plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+      scales:{
+        x:{grid:gridOpts,ticks:tickOpts},
+        y:{grid:gridOpts,ticks:{...tickOpts,callback:v=>'$'+v.toFixed(2)},
+           title:{display:true,text:'Avg EV ($)',color:'#7d8590'}},
+      }},
+  });
+
+  // Chart B: avg EV by credit
+  const dsCredit = [];
+  if (evMode !== 'call') dsCredit.push(makeDS('Bull Put',  avgColArr(putEV),  '#4fc3f7'));
+  if (evMode !== 'put')  dsCredit.push(makeDS('Bear Call', avgColArr(callEV), '#f06292', [4,3]));
+  evCharts['c'] = new Chart(document.getElementById('ev-chart-credit'), {
+    type:'line', data:{labels:creditLabels,datasets:dsCredit},
+    options:{responsive:true,
+      plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+      scales:{
+        x:{grid:gridOpts,ticks:tickOpts},
+        y:{grid:gridOpts,ticks:{...tickOpts,callback:v=>'$'+v.toFixed(2)},
+           title:{display:true,text:'Avg EV ($)',color:'#7d8590'}},
+      }},
+  });
+
+  // Charts C & D: EV by credit, per selected wing
+  const selIdx   = [0,1,3,5,10];
+  const selColors= ['#58a6ff','#3fb950','#d2a679','#a5d6ff','#ffa657'];
+
+  ['ev-chart-put-lines','ev-chart-call-lines'].forEach((id,si) => {
+    const arr = si===0 ? putEV : callEV;
+    evCharts[id] = new Chart(document.getElementById(id), {
+      type:'line',
+      data:{
+        labels: creditLabels,
+        datasets: selIdx.map((wi,i) => ({
+          label: `${wings[wi]}pts`,
+          data: arr[wi],
+          borderColor: selColors[i],
+          backgroundColor: 'transparent',
+          tension: 0.3, pointRadius: 3,
+          borderDash: wi===0 ? [3,2] : [],
+        })),
+      },
+      options:{responsive:true,
+        plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+        scales:{
+          x:{grid:gridOpts,ticks:tickOpts},
+          y:{grid:gridOpts,ticks:{...tickOpts,callback:v=>'$'+v.toFixed(2)},
+             title:{display:true,text:'EV ($)',color:'#7d8590'}},
+        }},
+    });
+  });
+}
+
+// initialise EV section
+renderEVStats();
+renderEVTable();
+renderEVCharts();
+
+
+// ── POSITIVE EXPECTANCY SECTION ───────────────────────────────────────
+// PE = EV / MaxLoss = (3W-2)/2   (independent of credit size)
+// This is the pure edge ratio: profit per dollar risked.
+
+const putPE  = putData.map(row  => row.map(w  => +((3*(w/100)-2)/2).toFixed(4)));
+const callPE = callData.map(row => row.map(w  => +((3*(w/100)-2)/2).toFixed(4)));
+
+function peClass(v) {
+  if (v < 0)     return 'pe-neg';
+  if (v < 0.02)  return 'pe-low';
+  if (v < 0.06)  return 'pe-mid';
+  return 'pe-high';
+}
+
+function maxPECell(arr) {
+  let best = { val:-Infinity, wi:-1, ci:-1 };
+  arr.forEach((row,ri) => row.forEach((v,ci) => { if(v>best.val) best={val:v,wi:ri,ci:ci}; }));
+  return best;
+}
+
+let peMode = 'both';
+let peCharts = {};
+
+function setPEMode(m) {
+  peMode = m;
+  ['put','call','both'].forEach(k => {
+    const el = document.getElementById('pe-tab-'+k);
+    el.className = 'pe-tab' + (k===m ? ' active-'+m : '');
+  });
+  renderPETable();
+  renderPECharts();
+}
+
+function renderPEStats() {
+  const bp = maxPECell(putPE), bc = maxPECell(callPE);
+  const allP = putPE.flat(), allC = callPE.flat();
+  const posP = allP.filter(v=>v>0).length, posC = allC.filter(v=>v>0).length;
+  const avgP = (allP.reduce((a,b)=>a+b,0)/allP.length);
+  const avgC = (allC.reduce((a,b)=>a+b,0)/allC.length);
+  // Best single combo by absolute EV (PE * credit)
+  let bestPutCombo={ev:-Infinity,wi:-1,ci:-1}, bestCallCombo={ev:-Infinity,wi:-1,ci:-1};
+  putEV.forEach((row,ri)=>row.forEach((v,ci)=>{if(v>bestPutCombo.ev)bestPutCombo={ev:v,wi:ri,ci:ci};}));
+  callEV.forEach((row,ri)=>row.forEach((v,ci)=>{if(v>bestCallCombo.ev)bestCallCombo={ev:v,wi:ri,ci:ci};}));
+
+  document.getElementById('pe-stats').innerHTML = `
+    <div class="stat-box">
+      <div class="stat-label">Best Bull Put PE</div>
+      <div class="pe-val-put">${(bp.val*100).toFixed(1)}%</div>
+      <div class="stat-note">${wings[bp.wi]}pt wing · $${credits[bp.ci].toFixed(2)} credit</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Best Bear Call PE</div>
+      <div class="pe-val-call">${(bc.val*100).toFixed(1)}%</div>
+      <div class="stat-note">${wings[bc.wi]}pt wing · $${credits[bc.ci].toFixed(2)} credit</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Avg PE (all combos)</div>
+      <div class="stat-val" style="color:var(--put-accent);font-size:16px">P: ${(avgP*100).toFixed(1)}%</div>
+      <div class="stat-note" style="color:var(--call-accent)">C: ${(avgC*100).toFixed(1)}%</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Positive PE Combos</div>
+      <div class="stat-val" style="color:#39d353;font-size:18px">${posP}P / ${posC}C</div>
+      <div class="stat-note">of ${allP.length} combos each</div>
+    </div>
+  `;
+}
+
+function renderPETable() {
+  const showPut  = peMode !== 'call';
+  const showCall = peMode !== 'put';
+  const bp = maxPECell(putPE), bc = maxPECell(callPE);
+
+  document.getElementById('pe-table-label').textContent =
+    peMode==='put'  ? 'PE per combo — Bull Put' :
+    peMode==='call' ? 'PE per combo — Bear Call' :
+                      'PE per combo — Bull Put (top) / Bear Call (bottom)';
+
+  let html = '<thead><tr><th class="row-label">Wing ↓  Credit →</th>';
+  credits.forEach(c => { html += `<th>$${c.toFixed(2)}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  wings.forEach((w,ri) => {
+    html += `<tr><td class="row-label">${w} pts</td>`;
+    credits.forEach((c,ci) => {
+      if (showPut && showCall) {
+        const pv=putPE[ri][ci], cv=callPE[ri][ci];
+        const pStar=(ri===bp.wi&&ci===bp.ci)?'<span class="star">★</span>':'';
+        const cStar=(ri===bc.wi&&ci===bc.ci)?'<span class="star">★</span>':'';
+        html += `<td class="pe-cell">`;
+        html += `<span class="${peClass(pv)}">${pv>=0?'+':''}${(pv*100).toFixed(1)}%${pStar}</span>`;
+        html += `<br><span class="${peClass(cv)}" style="font-size:11px;opacity:.85">${cv>=0?'+':''}${(cv*100).toFixed(1)}%${cStar}</span>`;
+        html += `</td>`;
+      } else {
+        const arr = showPut ? putPE : callPE;
+        const best = showPut ? bp : bc;
+        const v = arr[ri][ci];
+        const star=(ri===best.wi&&ci===best.ci)?'<span class="star">★</span>':'';
+        html += `<td class="pe-cell ${peClass(v)}">${v>=0?'+':''}${(v*100).toFixed(1)}%${star}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  document.getElementById('pe-table').innerHTML = html;
+}
+
+function avgRowArrPE(arr){ return arr.map(row => +(row.reduce((a,b)=>a+b,0)/row.length).toFixed(4)); }
+function avgColArrPE(arr){ return credits.map((_,ci) => +(arr.reduce((a,row)=>a+row[ci],0)/arr.length).toFixed(4)); }
+
+function renderPECharts() {
+  Object.values(peCharts).forEach(c => c.destroy());
+  peCharts = {};
+
+  const wingLabels   = wings.map(w => w+'pts');
+  const creditLabels = credits.map(c => '$'+c.toFixed(2));
+
+  const makePEDS = (label, data, color, dash=[]) => ({
+    label, data,
+    borderColor: color,
+    backgroundColor: hexToRgba(color, 0.08),
+    tension: 0.3, pointRadius: 4, fill: true,
+    borderDash: dash,
+  });
+
+  const peTickOpts = { ...tickOpts, callback: v => (v*100).toFixed(1)+'%' };
+  const peYAxis = { grid:gridOpts, ticks:peTickOpts, title:{display:true,text:'PE (%)',color:'#7d8590'} };
+
+  // Chart A: avg PE by wing
+  const dsW = [];
+  if (peMode!=='call') dsW.push(makePEDS('Bull Put',  avgRowArrPE(putPE),  '#4fc3f7'));
+  if (peMode!=='put')  dsW.push(makePEDS('Bear Call', avgRowArrPE(callPE), '#f06292', [4,3]));
+  peCharts['w'] = new Chart(document.getElementById('pe-chart-wing'), {
+    type:'line', data:{labels:wingLabels, datasets:dsW},
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+      scales:{ x:{grid:gridOpts,ticks:tickOpts}, y:peYAxis } },
+  });
+
+  // Chart B: avg PE by credit
+  const dsC = [];
+  if (peMode!=='call') dsC.push(makePEDS('Bull Put',  avgColArrPE(putPE),  '#4fc3f7'));
+  if (peMode!=='put')  dsC.push(makePEDS('Bear Call', avgColArrPE(callPE), '#f06292', [4,3]));
+  peCharts['c'] = new Chart(document.getElementById('pe-chart-credit'), {
+    type:'line', data:{labels:creditLabels, datasets:dsC},
+    options:{ responsive:true, plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+      scales:{ x:{grid:gridOpts,ticks:tickOpts}, y:peYAxis } },
+  });
+
+  // Charts C & D: PE by credit per selected wing
+  const selIdx    = [0,1,3,5,10];
+  const selColors = ['#58a6ff','#3fb950','#d2a679','#a5d6ff','#ffa657'];
+
+  ['pe-chart-put-lines','pe-chart-call-lines'].forEach((id,si) => {
+    const arr = si===0 ? putPE : callPE;
+    peCharts[id] = new Chart(document.getElementById(id), {
+      type:'line',
+      data:{
+        labels: creditLabels,
+        datasets: selIdx.map((wi,i) => ({
+          label: `${wings[wi]}pts`,
+          data: arr[wi],
+          borderColor: selColors[i],
+          backgroundColor: 'transparent',
+          tension: 0.3, pointRadius: 3,
+          borderDash: wi===0?[3,2]:[],
+        })),
+      },
+      options:{ responsive:true,
+        plugins:{legend:{labels:{color:'#7d8590',boxWidth:12}}},
+        scales:{ x:{grid:gridOpts,ticks:tickOpts}, y:peYAxis } },
+    });
+  });
+}
+
+// initialise PE section
+renderPEStats();
+renderPETable();
+renderPECharts();
+
+</script>
+</body>
+</html>
