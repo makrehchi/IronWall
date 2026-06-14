@@ -1,0 +1,1232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPX Iron Condor Backtester</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172026;
+      --muted: #66717a;
+      --line: #d9e0e6;
+      --panel: #ffffff;
+      --bg: #f4f7f8;
+      --soft: #eef4f5;
+      --blue: #2563eb;
+      --green: #087f5b;
+      --red: #c92a2a;
+      --amber: #b7791f;
+      --teal: #0f766e;
+      --shadow: 0 8px 24px rgba(23, 32, 38, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+
+    header {
+      background: #101820;
+      color: #fff;
+      padding: 22px 26px;
+      border-bottom: 4px solid #2dd4bf;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 42px);
+      letter-spacing: 0;
+      font-weight: 760;
+    }
+
+    header p {
+      max-width: 1020px;
+      margin: 8px 0 0;
+      color: #cbd5df;
+      font-size: 15px;
+    }
+
+    main {
+      padding: 20px;
+      display: grid;
+      grid-template-columns: minmax(260px, 330px) minmax(0, 1fr);
+      gap: 18px;
+    }
+
+    aside, section.panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    aside {
+      align-self: start;
+      position: sticky;
+      top: 12px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+
+    .block { padding: 16px; border-bottom: 1px solid var(--line); }
+    .block:last-child { border-bottom: 0; }
+    .block h2, .panel h2 {
+      margin: 0 0 12px;
+      font-size: 15px;
+      text-transform: uppercase;
+      color: #34424d;
+      letter-spacing: .04em;
+    }
+
+    .stack { display: grid; gap: 10px; }
+    label {
+      display: grid;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 650;
+    }
+
+    input, select, button {
+      font: inherit;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      min-height: 38px;
+    }
+
+    input, select { padding: 8px 10px; width: 100%; }
+    input[type="file"] { font-size: 12px; }
+    input[type="checkbox"] { width: auto; min-height: 0; }
+
+    button {
+      cursor: pointer;
+      padding: 8px 12px;
+      font-weight: 720;
+      transition: transform .12s ease, border-color .12s ease, background .12s ease;
+    }
+
+    button:hover { transform: translateY(-1px); border-color: #8aa2b4; }
+    button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    button.ghost { background: var(--soft); }
+    button:disabled { cursor: not-allowed; opacity: .55; transform: none; }
+
+    .button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pill-row, .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .pill {
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: #fff;
+      font-size: 12px;
+      color: #3a4852;
+      user-select: none;
+    }
+
+    .pill input { margin: 0; }
+
+    .content {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .panel { padding: 16px; min-width: 0; }
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 8px;
+      background: #e5ebef;
+      border-radius: 999px;
+      overflow: hidden;
+      min-width: 130px;
+      flex: 0 0 220px;
+    }
+
+    .progress > div {
+      height: 100%;
+      width: 0%;
+      background: var(--teal);
+      transition: width .15s ease;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfd;
+      min-height: 82px;
+    }
+
+    .kpi small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .kpi strong {
+      display: block;
+      margin-top: 5px;
+      font-size: clamp(20px, 2.1vw, 29px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+    .amber { color: var(--amber); }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(300px, .85fr);
+      gap: 14px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 280px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) { text-align: left; }
+    th {
+      color: #46545f;
+      font-size: 12px;
+      background: #f7fafb;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .table-wrap {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      max-height: 470px;
+      background: #fff;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      margin: 8px 0 0;
+    }
+
+    .inline {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .empty {
+      padding: 28px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed #aebbc5;
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    @media (max-width: 1120px) {
+      main { grid-template-columns: 1fr; }
+      aside { position: static; max-height: none; }
+      .kpis { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 650px) {
+      main { padding: 12px; }
+      header { padding: 18px 14px; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .button-row, .inline { grid-template-columns: 1fr; }
+      th, td { padding: 8px 6px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SPX Iron Condor Backtester</h1>
+    <p>Load every <strong>Trades*.*</strong> file from your backtest folder, filter by wing, credit, stop loss, side, weekday, entry interval, and history window, then rank the best parameter combinations.</p>
+  </header>
+
+  <main>
+    <aside>
+      <div class="block">
+        <h2>Data</h2>
+        <div class="stack">
+          <div class="button-row">
+            <button id="folderBtn" class="primary" type="button" title="Choose a folder containing Trades files">Open Folder</button>
+            <button id="reloadBtn" class="ghost" type="button" disabled title="Re-read the last chosen folder">Reload</button>
+          </div>
+          <label>Or select files
+            <input id="fileInput" type="file" multiple webkitdirectory>
+          </label>
+          <button id="clearBtn" class="ghost" type="button">Clear Data</button>
+          <p class="note">Browsers cannot read a local folder automatically. Use the folder button or select all matching files when you add new backtest data.</p>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>History</h2>
+        <div class="stack">
+          <label>Lookback
+            <select id="lookback">
+              <option value="all">All loaded history</option>
+              <option value="30">Last 30 calendar days</option>
+              <option value="60">Last 60 calendar days</option>
+              <option value="90">Last 90 calendar days</option>
+              <option value="180">Last 180 calendar days</option>
+              <option value="365">Last 1 year</option>
+              <option value="custom">Custom date range</option>
+            </select>
+          </label>
+          <div class="inline">
+            <label>From <input id="fromDate" type="date"></label>
+            <label>To <input id="toDate" type="date"></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>Strategy</h2>
+        <div class="stack">
+          <label>Side
+            <select id="side">
+              <option value="Both">Iron Condor: put + call</option>
+              <option value="P">Bull put only</option>
+              <option value="C">Bear call only</option>
+            </select>
+          </label>
+          <label>Wing size <select id="wing"><option value="all">All</option></select></label>
+          <label>Credit <select id="credit"><option value="all">All</option></select></label>
+          <label>Stop loss <select id="stop"><option value="all">All</option></select></label>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>Entry Days</h2>
+        <div id="dayChecks" class="checks"></div>
+      </div>
+
+      <div class="block">
+        <h2>Entry Times</h2>
+        <div class="button-row">
+          <button id="allTimes" class="ghost" type="button">All</button>
+          <button id="noTimes" class="ghost" type="button">None</button>
+        </div>
+        <div id="timeChecks" class="checks" style="margin-top:10px"></div>
+      </div>
+
+      <div class="block">
+        <h2>Optimizer</h2>
+        <div class="stack">
+          <label>Primary goal
+            <select id="goal">
+              <option value="balanced">Balanced score</option>
+              <option value="pnl">Highest total P/L</option>
+              <option value="win">Highest win rate</option>
+              <option value="dd">Minimum drawdown</option>
+              <option value="pf">Highest profit factor</option>
+              <option value="expectancy">Highest expectancy</option>
+            </select>
+          </label>
+          <label>Minimum samples
+            <input id="minSamples" type="number" min="1" step="1" value="25">
+          </label>
+        </div>
+      </div>
+    </aside>
+
+    <div class="content">
+      <section class="panel">
+        <div class="status">
+          <div id="statusText">Load a folder or files to begin.</div>
+          <div class="progress" aria-label="Load progress"><div id="progressBar"></div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Backtest Summary</h2>
+        <div id="kpis" class="kpis"></div>
+      </section>
+
+      <section class="grid-2">
+        <section class="panel">
+          <h2>Equity Curve</h2>
+          <canvas id="equityCanvas" width="1100" height="420"></canvas>
+        </section>
+        <section class="panel">
+          <h2>Breakdown</h2>
+          <canvas id="barCanvas" width="720" height="420"></canvas>
+        </section>
+      </section>
+
+      <section class="panel">
+        <h2>Recommended Parameters</h2>
+        <div id="recommendations"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Filtered Trades</h2>
+        <div id="tradesTable"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      legs: [],
+      files: [],
+      filteredTrades: [],
+      minDate: null,
+      maxDate: null,
+      dirHandle: null
+    };
+
+    const els = {
+      folderBtn: document.getElementById('folderBtn'),
+      reloadBtn: document.getElementById('reloadBtn'),
+      fileInput: document.getElementById('fileInput'),
+      clearBtn: document.getElementById('clearBtn'),
+      statusText: document.getElementById('statusText'),
+      progressBar: document.getElementById('progressBar'),
+      lookback: document.getElementById('lookback'),
+      fromDate: document.getElementById('fromDate'),
+      toDate: document.getElementById('toDate'),
+      side: document.getElementById('side'),
+      wing: document.getElementById('wing'),
+      credit: document.getElementById('credit'),
+      stop: document.getElementById('stop'),
+      dayChecks: document.getElementById('dayChecks'),
+      timeChecks: document.getElementById('timeChecks'),
+      allTimes: document.getElementById('allTimes'),
+      noTimes: document.getElementById('noTimes'),
+      goal: document.getElementById('goal'),
+      minSamples: document.getElementById('minSamples'),
+      kpis: document.getElementById('kpis'),
+      recommendations: document.getElementById('recommendations'),
+      tradesTable: document.getElementById('tradesTable'),
+      equityCanvas: document.getElementById('equityCanvas'),
+      barCanvas: document.getElementById('barCanvas')
+    };
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const tradingDays = [1, 2, 3, 4, 5];
+    const stopLabels = { 1: '1x', 1.25: '1.25x', 1.5: '1.5x', 2: '2x', 3: '3x' };
+
+    buildStaticFilters();
+    renderEmpty();
+
+    els.folderBtn.addEventListener('click', openFolder);
+    els.reloadBtn.addEventListener('click', reloadFolder);
+    els.fileInput.addEventListener('change', event => loadFiles([...event.target.files]));
+    els.clearBtn.addEventListener('click', clearData);
+    els.allTimes.addEventListener('click', () => setAllTimeChecks(true));
+    els.noTimes.addEventListener('click', () => setAllTimeChecks(false));
+
+    [
+      els.lookback, els.fromDate, els.toDate, els.side, els.wing, els.credit,
+      els.stop, els.goal, els.minSamples
+    ].forEach(el => el.addEventListener('input', refresh));
+
+    async function openFolder() {
+      if (!window.showDirectoryPicker) {
+        els.statusText.textContent = 'This browser does not expose folder picking. Use the file selector.';
+        els.fileInput.click();
+        return;
+      }
+      try {
+        const dir = await window.showDirectoryPicker();
+        state.dirHandle = dir;
+        els.reloadBtn.disabled = false;
+        const files = await filesFromDirectory(dir);
+        await loadFiles(files);
+      } catch (error) {
+        if (error && error.name !== 'AbortError') els.statusText.textContent = error.message;
+      }
+    }
+
+    async function reloadFolder() {
+      if (!state.dirHandle) return;
+      try {
+        const files = await filesFromDirectory(state.dirHandle);
+        await loadFiles(files);
+      } catch (error) {
+        els.statusText.textContent = `Could not reload folder: ${error.message}`;
+      }
+    }
+
+    async function filesFromDirectory(dir) {
+      const files = [];
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'file' && /^Trades.*\./i.test(entry.name)) files.push(await entry.getFile());
+      }
+      return files;
+    }
+
+    async function loadFiles(files) {
+      const matches = files.filter(file => /^Trades.*\./i.test(file.name));
+      if (!matches.length) {
+        els.statusText.textContent = 'No Trades*.* files were selected.';
+        return;
+      }
+
+      state.legs = [];
+      state.files = [];
+      setProgress(0);
+      els.statusText.textContent = `Loading ${matches.length} file(s)...`;
+
+      for (let i = 0; i < matches.length; i++) {
+        const file = matches[i];
+        const meta = parseFileName(file.name);
+        if (!meta) continue;
+        const text = await file.text();
+        const parsed = parseCsv(text);
+        const legs = rowsToLegs(parsed.headers, parsed.rows, file.name, meta);
+        state.legs.push(...legs);
+        state.files.push({ name: file.name, rows: legs.length, ...meta });
+        setProgress(((i + 1) / matches.length) * 100);
+        if (i % 4 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      state.legs.sort(compareTradeTime);
+      const dates = state.legs.map(row => row.date).filter(Boolean).sort();
+      state.minDate = dates[0] || null;
+      state.maxDate = dates[dates.length - 1] || null;
+      els.fromDate.value = state.minDate || '';
+      els.toDate.value = state.maxDate || '';
+      updateDynamicFilters();
+      els.statusText.textContent = `${formatInt(state.legs.length)} option legs loaded from ${state.files.length} file(s), ${state.minDate || '?'} to ${state.maxDate || '?'}.`;
+      refresh();
+    }
+
+    function clearData() {
+      state.legs = [];
+      state.files = [];
+      state.filteredTrades = [];
+      state.minDate = null;
+      state.maxDate = null;
+      state.dirHandle = null;
+      els.reloadBtn.disabled = true;
+      els.fileInput.value = '';
+      ['wing', 'credit', 'stop'].forEach(id => els[id].innerHTML = '<option value="all">All</option>');
+      els.timeChecks.innerHTML = '';
+      els.fromDate.value = '';
+      els.toDate.value = '';
+      setProgress(0);
+      els.statusText.textContent = 'Load a folder or files to begin.';
+      renderEmpty();
+    }
+
+    function parseFileName(name) {
+      const match = name.match(/^Trades-(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)-([^-.\s]+).*$/i);
+      if (!match) return null;
+      const wing = Number(match[1]);
+      const creditCode = Number(match[2]);
+      const stopCode = match[3];
+      const stop = stopCode === '125' ? 1.25 : stopCode === '150' ? 1.5 : Number(stopCode);
+      return {
+        wing,
+        creditCode,
+        credit: creditCode / 10,
+        stopCode,
+        stop
+      };
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          row.push(cell);
+          cell = '';
+        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+          if (char === '\r' && next === '\n') i++;
+          row.push(cell);
+          if (row.some(value => value !== '')) rows.push(row);
+          row = [];
+          cell = '';
+        } else {
+          cell += char;
+        }
+      }
+      if (cell || row.length) {
+        row.push(cell);
+        if (row.some(value => value !== '')) rows.push(row);
+      }
+      return { headers: rows[0] || [], rows: rows.slice(1) };
+    }
+
+    function rowsToLegs(headers, rows, fileName, meta) {
+      const index = Object.fromEntries(headers.map((header, i) => [header.trim(), i]));
+      const needed = ['OptionType', 'OpenDate', 'OpenTime', 'ProfitLossAfterSlippage'];
+      if (!needed.every(key => key in index)) return [];
+      return rows.map(cols => {
+        const date = value(cols, index, 'OpenDate') || normalizeDate(value(cols, index, 'EntryTime'));
+        const time = normalizeTime(value(cols, index, 'OpenTime') || timeFromDateTime(value(cols, index, 'EntryTime')));
+        const optionType = value(cols, index, 'OptionType').trim().toUpperCase();
+        const pnl = number(value(cols, index, 'ProfitLossAfterSlippage')) || number(value(cols, index, 'ProfitLoss'));
+        const premium = number(value(cols, index, 'Premium'));
+        const vix = number(value(cols, index, 'VIX'));
+        const rowDate = makeDate(date);
+        return {
+          fileName,
+          optionType,
+          date,
+          time,
+          timestamp: `${date}T${time || '00:00:00'}`,
+          day: rowDate ? rowDate.getDay() : null,
+          pnl,
+          premium,
+          vix,
+          outcome: value(cols, index, 'Outcome') || (pnl > 0 ? 'Win' : 'Loss'),
+          tradeId: value(cols, index, 'TradeID'),
+          shortStrike: number(value(cols, index, 'ShortStrike')),
+          longStrike: number(value(cols, index, 'LongStrike')),
+          width: number(value(cols, index, 'Width')) || meta.wing,
+          ...meta
+        };
+      }).filter(row => row.date && row.time && ['P', 'C'].includes(row.optionType) && Number.isFinite(row.pnl));
+    }
+
+    function value(cols, index, key) {
+      return index[key] === undefined ? '' : (cols[index[key]] || '').trim();
+    }
+
+    function normalizeDate(text) {
+      if (!text) return '';
+      const datePart = text.split(/\s+/)[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+      const parts = datePart.split('/');
+      if (parts.length === 3) {
+        const [m, d, y] = parts;
+        return `${y.padStart(4, '20')}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      return '';
+    }
+
+    function timeFromDateTime(text) {
+      if (!text) return '';
+      const parts = text.trim().split(/\s+/);
+      return parts.length >= 2 ? parts[1] : '';
+    }
+
+    function normalizeTime(text) {
+      if (!text) return '';
+      const clean = text.trim();
+      const ampm = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+      if (ampm) {
+        let hour = Number(ampm[1]);
+        if (ampm[4].toUpperCase() === 'PM' && hour !== 12) hour += 12;
+        if (ampm[4].toUpperCase() === 'AM' && hour === 12) hour = 0;
+        return `${String(hour).padStart(2, '0')}:${ampm[2]}:${ampm[3] || '00'}`;
+      }
+      const parts = clean.split(':');
+      if (parts.length >= 2) return `${parts[0].padStart(2, '0')}:${parts[1]}:${parts[2] || '00'}`;
+      return clean;
+    }
+
+    function makeDate(iso) {
+      if (!iso) return null;
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    }
+
+    function number(text) {
+      const n = Number(String(text || '').replace(/[$,%]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function buildStaticFilters() {
+      els.dayChecks.innerHTML = tradingDays.map(day => `
+        <label class="pill"><input type="checkbox" value="${day}" checked> ${dayNames[day]}</label>
+      `).join('');
+      els.dayChecks.querySelectorAll('input').forEach(input => input.addEventListener('change', refresh));
+    }
+
+    function updateDynamicFilters() {
+      fillSelect(els.wing, unique(state.legs.map(row => row.wing)).sort((a, b) => a - b), value => `${value}`);
+      fillSelect(els.credit, unique(state.legs.map(row => row.credit)).sort((a, b) => a - b), value => `$${formatMoney(value)}`);
+      fillSelect(els.stop, unique(state.legs.map(row => row.stop)).sort((a, b) => a - b), value => stopLabels[value] || `${value}x`);
+      const times = unique(state.legs.map(row => row.time)).sort();
+      els.timeChecks.innerHTML = times.map(time => `
+        <label class="pill"><input type="checkbox" value="${time}" checked> ${shortTime(time)}</label>
+      `).join('');
+      els.timeChecks.querySelectorAll('input').forEach(input => input.addEventListener('change', refresh));
+    }
+
+    function fillSelect(select, values, labeler) {
+      const current = select.value;
+      select.innerHTML = '<option value="all">All</option>' + values.map(value => `<option value="${value}">${labeler(value)}</option>`).join('');
+      select.value = [...select.options].some(option => option.value === current) ? current : 'all';
+    }
+
+    function unique(values) {
+      return [...new Set(values.filter(value => value !== null && value !== undefined && value !== ''))];
+    }
+
+    function setAllTimeChecks(checked) {
+      els.timeChecks.querySelectorAll('input').forEach(input => { input.checked = checked; });
+      refresh();
+    }
+
+    function refresh() {
+      if (!state.legs.length) {
+        renderEmpty();
+        return;
+      }
+      const filters = currentFilters();
+      const filteredLegs = state.legs.filter(row => legPasses(row, filters));
+      const trades = buildTrades(filteredLegs, filters.side);
+      state.filteredTrades = trades;
+      const metrics = calcMetrics(trades);
+      renderKpis(metrics);
+      renderEquity(trades);
+      renderBars(trades);
+      renderRecommendations(filteredLegs, filters);
+      renderTrades(trades);
+      els.statusText.textContent = `${formatInt(trades.length)} ${filters.side === 'Both' ? 'iron condor entries' : 'single-side entries'} from ${formatInt(filteredLegs.length)} option legs.`;
+    }
+
+    function currentFilters() {
+      const selectedDays = checkedValues(els.dayChecks).map(Number);
+      const selectedTimes = checkedValues(els.timeChecks);
+      let from = els.fromDate.value || state.minDate;
+      let to = els.toDate.value || state.maxDate;
+      if (els.lookback.value !== 'all' && els.lookback.value !== 'custom' && state.maxDate) {
+        const end = makeDate(state.maxDate);
+        end.setDate(end.getDate() - Number(els.lookback.value));
+        from = toIso(end);
+        to = state.maxDate;
+      }
+      return {
+        from,
+        to,
+        side: els.side.value,
+        wing: els.wing.value,
+        credit: els.credit.value,
+        stop: els.stop.value,
+        selectedDays,
+        selectedTimes,
+        dayFilterActive: els.dayChecks.querySelectorAll('input').length > 0,
+        timeFilterActive: els.timeChecks.querySelectorAll('input').length > 0,
+        goal: els.goal.value,
+        minSamples: Math.max(1, Number(els.minSamples.value) || 1)
+      };
+    }
+
+    function checkedValues(container) {
+      return [...container.querySelectorAll('input:checked')].map(input => input.value);
+    }
+
+    function legPasses(row, filters) {
+      if (filters.from && row.date < filters.from) return false;
+      if (filters.to && row.date > filters.to) return false;
+      if (filters.side !== 'Both' && row.optionType !== filters.side) return false;
+      if (filters.wing !== 'all' && row.wing !== Number(filters.wing)) return false;
+      if (filters.credit !== 'all' && row.credit !== Number(filters.credit)) return false;
+      if (filters.stop !== 'all' && row.stop !== Number(filters.stop)) return false;
+      if (filters.dayFilterActive && !filters.selectedDays.includes(row.day)) return false;
+      if (filters.timeFilterActive && !filters.selectedTimes.includes(row.time)) return false;
+      return true;
+    }
+
+    function buildTrades(legs, side) {
+      if (side !== 'Both') {
+        return legs.map(row => ({
+          date: row.date,
+          time: row.time,
+          timestamp: row.timestamp,
+          day: row.day,
+          side: row.optionType,
+          wing: row.wing,
+          credit: row.credit,
+          stop: row.stop,
+          pnl: row.pnl,
+          premium: row.premium,
+          vix: row.vix,
+          outcome: row.pnl > 0 ? 'Win' : 'Loss',
+          fileName: row.fileName,
+          legs: 1
+        })).sort(compareTradeTime);
+      }
+
+      const groups = new Map();
+      for (const row of legs) {
+        const key = [row.fileName, row.date, row.time, row.wing, row.credit, row.stop].join('|');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(row);
+      }
+
+      const trades = [];
+      for (const group of groups.values()) {
+        const put = group.find(row => row.optionType === 'P');
+        const call = group.find(row => row.optionType === 'C');
+        if (!put || !call) continue;
+        const pnl = put.pnl + call.pnl;
+        trades.push({
+          date: put.date,
+          time: put.time,
+          timestamp: put.timestamp,
+          day: put.day,
+          side: 'Both',
+          wing: put.wing,
+          credit: put.credit,
+          stop: put.stop,
+          pnl,
+          premium: put.premium + call.premium,
+          vix: average([put.vix, call.vix]),
+          outcome: pnl > 0 ? 'Win' : 'Loss',
+          fileName: put.fileName,
+          legs: 2
+        });
+      }
+      return trades.sort(compareTradeTime);
+    }
+
+    function calcMetrics(trades) {
+      if (!trades.length) return emptyMetrics();
+      let equity = 0;
+      let peak = 0;
+      let maxDrawdown = 0;
+      let wins = 0;
+      let grossWin = 0;
+      let grossLoss = 0;
+      let maxConsecutiveLosses = 0;
+      let lossStreak = 0;
+      const byDay = new Map();
+      const equityPoints = [];
+
+      for (const trade of trades) {
+        equity += trade.pnl;
+        peak = Math.max(peak, equity);
+        maxDrawdown = Math.min(maxDrawdown, equity - peak);
+        equityPoints.push({ x: trade.timestamp, y: equity });
+        byDay.set(trade.date, (byDay.get(trade.date) || 0) + trade.pnl);
+        if (trade.pnl > 0) {
+          wins++;
+          grossWin += trade.pnl;
+          lossStreak = 0;
+        } else {
+          grossLoss += trade.pnl;
+          lossStreak++;
+          maxConsecutiveLosses = Math.max(maxConsecutiveLosses, lossStreak);
+        }
+      }
+
+      const daily = [...byDay.values()];
+      const avgDaily = average(daily);
+      const stdDaily = stddev(daily);
+      return {
+        count: trades.length,
+        totalPnl: equity,
+        winRate: wins / trades.length,
+        avgPnl: equity / trades.length,
+        grossWin,
+        grossLoss,
+        profitFactor: grossLoss === 0 ? Infinity : grossWin / Math.abs(grossLoss),
+        maxDrawdown,
+        maxConsecutiveLosses,
+        avgVix: average(trades.map(trade => trade.vix).filter(Number.isFinite)),
+        sharpe: stdDaily ? (avgDaily / stdDaily) * Math.sqrt(252) : 0,
+        equityPoints
+      };
+    }
+
+    function emptyMetrics() {
+      return {
+        count: 0,
+        totalPnl: 0,
+        winRate: 0,
+        avgPnl: 0,
+        grossWin: 0,
+        grossLoss: 0,
+        profitFactor: 0,
+        maxDrawdown: 0,
+        maxConsecutiveLosses: 0,
+        avgVix: 0,
+        sharpe: 0,
+        equityPoints: []
+      };
+    }
+
+    function renderKpis(metrics) {
+      const kpis = [
+        ['Entries', formatInt(metrics.count), ''],
+        ['Total P/L', money(metrics.totalPnl), metrics.totalPnl >= 0 ? 'positive' : 'negative'],
+        ['Win Rate', pct(metrics.winRate), metrics.winRate >= .65 ? 'positive' : metrics.winRate >= .5 ? 'amber' : 'negative'],
+        ['Max Drawdown', money(metrics.maxDrawdown), metrics.maxDrawdown < 0 ? 'negative' : ''],
+        ['Profit Factor', finite(metrics.profitFactor), metrics.profitFactor >= 1.25 ? 'positive' : metrics.profitFactor >= 1 ? 'amber' : 'negative'],
+        ['Expectancy', money(metrics.avgPnl), metrics.avgPnl >= 0 ? 'positive' : 'negative'],
+        ['Sharpe', metrics.sharpe.toFixed(2), metrics.sharpe >= 1 ? 'positive' : metrics.sharpe >= 0 ? 'amber' : 'negative'],
+        ['Avg VIX', metrics.avgVix.toFixed(2), ''],
+        ['Loss Streak', formatInt(metrics.maxConsecutiveLosses), metrics.maxConsecutiveLosses <= 3 ? 'positive' : 'amber'],
+        ['Gross Wins', money(metrics.grossWin), 'positive'],
+        ['Gross Losses', money(metrics.grossLoss), 'negative'],
+        ['Avg P/L', money(metrics.avgPnl), metrics.avgPnl >= 0 ? 'positive' : 'negative']
+      ];
+      els.kpis.innerHTML = kpis.map(([label, value, cls]) => `
+        <div class="kpi"><small>${label}</small><strong class="${cls}">${value}</strong></div>
+      `).join('');
+    }
+
+    function renderEquity(trades) {
+      const ctx = els.equityCanvas.getContext('2d');
+      const points = calcMetrics(trades).equityPoints;
+      clearCanvas(ctx, els.equityCanvas);
+      drawAxes(ctx, els.equityCanvas, 'Cumulative P/L');
+      if (!points.length) return drawNoData(ctx, els.equityCanvas);
+      const values = points.map(point => point.y);
+      const [minValue, maxValue] = minMax(values);
+      const min = Math.min(0, minValue);
+      const max = Math.max(0, maxValue);
+      const pad = chartPad(els.equityCanvas);
+      const plotPoints = downsample(points, 2500);
+      ctx.beginPath();
+      plotPoints.forEach((point, i) => {
+        const x = pad.left + (plotPoints.length === 1 ? 0 : i / (plotPoints.length - 1)) * (els.equityCanvas.width - pad.left - pad.right);
+        const y = scale(point.y, min, max, els.equityCanvas.height - pad.bottom, pad.top);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = points[points.length - 1].y >= 0 ? '#087f5b' : '#c92a2a';
+      ctx.stroke();
+      drawZero(ctx, els.equityCanvas, min, max, pad);
+      drawChartLabels(ctx, els.equityCanvas, money(min), money(max));
+    }
+
+    function renderBars(trades) {
+      const ctx = els.barCanvas.getContext('2d');
+      clearCanvas(ctx, els.barCanvas);
+      drawAxes(ctx, els.barCanvas, 'P/L by Entry Time');
+      if (!trades.length) return drawNoData(ctx, els.barCanvas);
+      const byTime = new Map();
+      for (const trade of trades) byTime.set(trade.time, (byTime.get(trade.time) || 0) + trade.pnl);
+      const entries = [...byTime.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      const values = entries.map(entry => entry[1]);
+      const [minValue, maxValue] = minMax(values);
+      const min = Math.min(0, minValue);
+      const max = Math.max(0, maxValue);
+      const pad = chartPad(els.barCanvas);
+      const width = (els.barCanvas.width - pad.left - pad.right) / entries.length;
+      entries.forEach(([time, value], i) => {
+        const x = pad.left + i * width + 2;
+        const y = scale(Math.max(value, 0), min, max, els.barCanvas.height - pad.bottom, pad.top);
+        const y0 = scale(0, min, max, els.barCanvas.height - pad.bottom, pad.top);
+        const h = Math.abs(y0 - scale(value, min, max, els.barCanvas.height - pad.bottom, pad.top));
+        ctx.fillStyle = value >= 0 ? '#0f766e' : '#c92a2a';
+        ctx.fillRect(x, value >= 0 ? y : y0, Math.max(2, width - 4), Math.max(1, h));
+        if (i % 4 === 0) {
+          ctx.save();
+          ctx.translate(x + width / 2, els.barCanvas.height - 18);
+          ctx.rotate(-Math.PI / 4);
+          ctx.fillStyle = '#66717a';
+          ctx.font = '12px sans-serif';
+          ctx.fillText(shortTime(time), 0, 0);
+          ctx.restore();
+        }
+      });
+      drawZero(ctx, els.barCanvas, min, max, pad);
+      drawChartLabels(ctx, els.barCanvas, money(min), money(max));
+    }
+
+    function renderRecommendations(filteredLegs, filters) {
+      const strategies = new Map();
+      const sides = filters.side === 'Both' ? ['Both'] : [filters.side];
+      for (const side of sides) {
+        const trades = buildTrades(filteredLegs, side);
+        for (const trade of trades) {
+          const key = [trade.side, trade.wing, trade.credit, trade.stop, dayNames[trade.day], trade.time].join('|');
+          if (!strategies.has(key)) strategies.set(key, []);
+          strategies.get(key).push(trade);
+        }
+      }
+      const rows = [...strategies.entries()].map(([key, trades]) => {
+        const [side, wing, credit, stop, day, time] = key.split('|');
+        const metrics = calcMetrics(trades);
+        return { side, wing: Number(wing), credit: Number(credit), stop: Number(stop), day, time, trades, metrics };
+      }).filter(row => row.metrics.count >= filters.minSamples);
+
+      const scored = scoreRecommendations(rows, filters.goal).slice(0, 25);
+      if (!scored.length) {
+        els.recommendations.innerHTML = '<div class="empty">No recommendation has enough samples under the current filters.</div>';
+        return;
+      }
+      els.recommendations.innerHTML = tableHtml(scored, [
+        ['Rank', (_, i) => i + 1],
+        ['Side', row => row.side === 'Both' ? 'IC' : row.side],
+        ['Wing', row => row.wing],
+        ['Credit', row => `$${formatMoney(row.credit)}`],
+        ['Stop', row => stopLabels[row.stop] || `${row.stop}x`],
+        ['Day', row => row.day],
+        ['Time', row => shortTime(row.time)],
+        ['Entries', row => formatInt(row.metrics.count)],
+        ['P/L', row => spanMoney(row.metrics.totalPnl)],
+        ['Win %', row => pct(row.metrics.winRate)],
+        ['Max DD', row => spanMoney(row.metrics.maxDrawdown)],
+        ['PF', row => finite(row.metrics.profitFactor)],
+        ['Expect.', row => spanMoney(row.metrics.avgPnl)],
+        ['Score', row => row.score.toFixed(1)]
+      ]);
+    }
+
+    function scoreRecommendations(rows, goal) {
+      const accessors = {
+        pnl: row => row.metrics.totalPnl,
+        win: row => row.metrics.winRate,
+        dd: row => -Math.abs(row.metrics.maxDrawdown),
+        pf: row => Number.isFinite(row.metrics.profitFactor) ? row.metrics.profitFactor : 10,
+        expectancy: row => row.metrics.avgPnl,
+        samples: row => Math.log10(row.metrics.count + 1)
+      };
+      const normalized = {};
+      for (const key of Object.keys(accessors)) normalized[key] = normalizeRows(rows, accessors[key]);
+      const weights = {
+        balanced: { pnl: .28, win: .18, dd: .20, pf: .16, expectancy: .13, samples: .05 },
+        pnl: { pnl: .62, win: .05, dd: .10, pf: .08, expectancy: .10, samples: .05 },
+        win: { pnl: .12, win: .58, dd: .12, pf: .08, expectancy: .05, samples: .05 },
+        dd: { pnl: .14, win: .10, dd: .58, pf: .08, expectancy: .05, samples: .05 },
+        pf: { pnl: .16, win: .08, dd: .12, pf: .52, expectancy: .07, samples: .05 },
+        expectancy: { pnl: .18, win: .08, dd: .12, pf: .10, expectancy: .47, samples: .05 }
+      }[goal];
+      return rows.map((row, i) => {
+        let score = 0;
+        for (const [key, weight] of Object.entries(weights)) score += normalized[key][i] * weight * 100;
+        return { ...row, score };
+      }).sort((a, b) => b.score - a.score);
+    }
+
+    function normalizeRows(rows, accessor) {
+      const values = rows.map(accessor);
+      const [min, max] = minMax(values);
+      if (max === min) return rows.map(() => 1);
+      return values.map(value => (value - min) / (max - min));
+    }
+
+    function renderTrades(trades) {
+      const rows = trades.slice(-500).reverse();
+      if (!rows.length) {
+        els.tradesTable.innerHTML = '<div class="empty">No trades match the current filters.</div>';
+        return;
+      }
+      els.tradesTable.innerHTML = tableHtml(rows, [
+        ['Date', row => row.date],
+        ['Time', row => shortTime(row.time)],
+        ['Day', row => dayNames[row.day]],
+        ['Side', row => row.side === 'Both' ? 'IC' : row.side],
+        ['Wing', row => row.wing],
+        ['Credit', row => `$${formatMoney(row.credit)}`],
+        ['Stop', row => stopLabels[row.stop] || `${row.stop}x`],
+        ['Premium', row => money(row.premium)],
+        ['P/L', row => spanMoney(row.pnl)],
+        ['Outcome', row => row.outcome],
+        ['VIX', row => row.vix.toFixed(2)],
+        ['File', row => row.fileName]
+      ]);
+    }
+
+    function tableHtml(rows, cols) {
+      return `<div class="table-wrap"><table><thead><tr>${cols.map(([name]) => `<th>${name}</th>`).join('')}</tr></thead><tbody>${
+        rows.map((row, i) => `<tr>${cols.map(([, getter]) => `<td>${getter(row, i)}</td>`).join('')}</tr>`).join('')
+      }</tbody></table></div>`;
+    }
+
+    function renderEmpty() {
+      renderKpis(emptyMetrics());
+      renderEquity([]);
+      renderBars([]);
+      els.recommendations.innerHTML = '<div class="empty">Load data to generate ranked strategy recommendations.</div>';
+      els.tradesTable.innerHTML = '<div class="empty">Load data to inspect filtered trades.</div>';
+    }
+
+    function compareTradeTime(a, b) {
+      return a.timestamp.localeCompare(b.timestamp) || String(a.fileName || '').localeCompare(String(b.fileName || ''));
+    }
+
+    function average(values) {
+      const clean = values.filter(Number.isFinite);
+      return clean.length ? clean.reduce((sum, value) => sum + value, 0) / clean.length : 0;
+    }
+
+    function stddev(values) {
+      if (values.length < 2) return 0;
+      const avg = average(values);
+      const variance = values.reduce((sum, value) => sum + Math.pow(value - avg, 2), 0) / (values.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function minMax(values) {
+      if (!values.length) return [0, 0];
+      let min = Infinity;
+      let max = -Infinity;
+      for (const value of values) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      return [min, max];
+    }
+
+    function downsample(points, limit) {
+      if (points.length <= limit) return points;
+      const step = (points.length - 1) / (limit - 1);
+      const sampled = [];
+      for (let i = 0; i < limit; i++) {
+        sampled.push(points[Math.round(i * step)]);
+      }
+      return sampled;
+    }
+
+    function toIso(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function shortTime(time) {
+      if (!time) return '';
+      const [h, m] = time.split(':').map(Number);
+      const hour = h % 12 || 12;
+      return `${hour}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    function formatMoney(value) {
+      return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function money(value) {
+      const prefix = value < 0 ? '-' : '';
+      return `${prefix}$${formatMoney(Math.abs(value))}`;
+    }
+
+    function spanMoney(value) {
+      return `<span class="${value >= 0 ? 'positive' : 'negative'}">${money(value)}</span>`;
+    }
+
+    function pct(value) {
+      return `${(value * 100).toFixed(1)}%`;
+    }
+
+    function finite(value) {
+      return Number.isFinite(value) ? value.toFixed(2) : '∞';
+    }
+
+    function formatInt(value) {
+      return Number(value || 0).toLocaleString();
+    }
+
+    function setProgress(value) {
+      els.progressBar.style.width = `${Math.max(0, Math.min(100, value))}%`;
+    }
+
+    function clearCanvas(ctx, canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function chartPad() {
+      return { left: 68, right: 24, top: 28, bottom: 62 };
+    }
+
+    function drawAxes(ctx, canvas, title) {
+      const pad = chartPad(canvas);
+      ctx.strokeStyle = '#d9e0e6';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, pad.top);
+      ctx.lineTo(pad.left, canvas.height - pad.bottom);
+      ctx.lineTo(canvas.width - pad.right, canvas.height - pad.bottom);
+      ctx.stroke();
+      ctx.fillStyle = '#34424d';
+      ctx.font = '700 18px sans-serif';
+      ctx.fillText(title, pad.left, 22);
+    }
+
+    function drawNoData(ctx, canvas) {
+      ctx.fillStyle = '#66717a';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No matching data', canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = 'left';
+    }
+
+    function scale(value, min, max, outMin, outMax) {
+      if (max === min) return (outMin + outMax) / 2;
+      return outMin + ((value - min) / (max - min)) * (outMax - outMin);
+    }
+
+    function drawZero(ctx, canvas, min, max, pad) {
+      const y0 = scale(0, min, max, canvas.height - pad.bottom, pad.top);
+      ctx.strokeStyle = '#93a4b1';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y0);
+      ctx.lineTo(canvas.width - pad.right, y0);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function drawChartLabels(ctx, canvas, minLabel, maxLabel) {
+      const pad = chartPad(canvas);
+      ctx.fillStyle = '#66717a';
+      ctx.font = '12px sans-serif';
+      ctx.fillText(maxLabel, 8, pad.top + 5);
+      ctx.fillText(minLabel, 8, canvas.height - pad.bottom + 5);
+    }
+  </script>
+</body>
+</html>
