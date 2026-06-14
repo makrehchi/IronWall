@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SPX Wing Size / Credit EV Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #18212f;
+      --muted: #637083;
+      --panel: #ffffff;
+      --line: #d8dee8;
+      --soft: #f4f7fb;
+      --green: #15845f;
+      --green-soft: #dff4ea;
+      --red: #b74343;
+      --red-soft: #fde7e2;
+      --amber: #b7791f;
+      --blue: #275b8f;
+      --teal: #227c8b;
+      --shadow: 0 18px 48px rgba(24, 33, 47, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, #edf4f8 0, #f8fafc 360px, #ffffff 100%);
+    }
+    main { max-width: 1320px; margin: 0 auto; padding: 32px 22px 48px; }
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 24px;
+    }
+    h1 { margin: 0 0 10px; font-size: 42px; line-height: 1.05; letter-spacing: 0; }
+    h2 { margin: 0 0 14px; font-size: 20px; letter-spacing: 0; }
+    h3 { margin: 0 0 6px; font-size: 14px; color: var(--muted); font-weight: 650; }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .subline { max-width: 760px; font-size: 16px; }
+    .formula {
+      background: #152234;
+      color: #f8fbff;
+      padding: 16px 18px;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .formula code { color: #9ce0c1; font-family: "Cascadia Code", Consolas, monospace; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .card, .panel {
+      background: var(--panel);
+      border: 1px solid rgba(216, 222, 232, 0.9);
+      border-radius: 8px;
+      box-shadow: 0 8px 28px rgba(24, 33, 47, 0.07);
+    }
+    .card { padding: 18px; min-height: 142px; }
+    .value { font-size: 30px; font-weight: 780; margin: 4px 0 7px; letter-spacing: 0; }
+    .detail { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .pill.good { background: var(--green-soft); color: var(--green); }
+    .pill.warn { background: #fff1d6; color: var(--amber); }
+    .pill.bad { background: var(--red-soft); color: var(--red); }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .panel { padding: 18px; margin-bottom: 18px; overflow: hidden; }
+    .panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+    .legend { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; flex-wrap: wrap; justify-content: flex-end; }
+    .scale {
+      width: 146px;
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #c94f4f, #f3f0e8 50%, #218d68);
+      border: 1px solid rgba(0,0,0,.08);
+    }
+    .heatmap-wrap { width: 100%; overflow-x: auto; padding-bottom: 4px; }
+    .heatmap { min-width: 600px; width: 100%; height: auto; display: block; }
+    .axis { fill: #5d6877; font-size: 12px; font-weight: 650; }
+    .cell-text { fill: #18212f; font-size: 11px; font-weight: 760; text-anchor: middle; dominant-baseline: central; }
+    .cell-subtext { fill: rgba(24,33,47,.72); font-size: 9px; font-weight: 650; text-anchor: middle; dominant-baseline: central; }
+    .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 9px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+    th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+    th { color: var(--muted); font-size: 12px; font-weight: 760; background: #f7f9fc; }
+    tr.best-row td { background: #edf8f2; font-weight: 760; }
+    .positive { color: var(--green); font-weight: 760; }
+    .negative { color: var(--red); font-weight: 760; }
+    .scatter { min-height: 440px; }
+    .note {
+      margin-top: 10px;
+      padding: 12px 14px;
+      border: 1px solid #d9e6ef;
+      background: #f6fbfd;
+      color: #526274;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .footer { color: var(--muted); font-size: 12px; margin-top: 16px; }
+    @media (max-width: 920px) {
+      header, .grid-2, .cards { grid-template-columns: 1fr; }
+      h1 { font-size: 32px; }
+      .panel-head { flex-direction: column; }
+      .legend { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>SPX Credit Spread EV Dashboard</h1>
+      <p class="subline">Backtest window: <strong>1/1/25 to 5/1/26</strong>. Bull put and bear call win rates are converted into expected value across wing size and collected credit.</p>
+    </div>
+    <div class="formula">
+      <div><strong>Expected value assumption</strong></div>
+      <div><code>EV = win_rate * credit - (1 - win_rate) * (2 * credit)</code></div>
+      <div><code>Break-even win rate = 66.67%</code></div>
+    </div>
+  </header>
+
+  <section class="cards" id="summaryCards"></section>
+
+  <section class="grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Bull Put EV Heatmap</h2>
+          <p>Each cell shows expected value, with win rate beneath it.</p>
+        </div>
+        <div class="legend"><span>lower EV</span><span class="scale"></span><span>higher EV</span></div>
+      </div>
+      <div class="heatmap-wrap" id="putHeatmap"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Bear Call EV Heatmap</h2>
+          <p>Positive zones clear the 66.67% win-rate hurdle.</p>
+        </div>
+        <div class="legend"><span>lower EV</span><span class="scale"></span><span>higher EV</span></div>
+      </div>
+      <div class="heatmap-wrap" id="callHeatmap"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>EV Landscape</h2>
+        <p>Bubble size scales with collected credit. The dashed line marks break-even win rate.</p>
+      </div>
+      <div class="legend"><span class="pill good">Bull Put</span><span class="pill warn">Bear Call</span></div>
+    </div>
+    <div id="scatter" class="scatter"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Positive Expectancy</h2>
+        <p>Average expected value after filtering out setups whose EV is zero or negative.</p>
+      </div>
+      <div class="legend"><span class="pill good">EV &gt; 0 only</span></div>
+    </div>
+    <div id="positiveExpectancyTable"></div>
+    <div class="note">Positive expectancy answers: among the setups that clear the 2x-credit stop-loss hurdle, what is the average expected value per spread?</div>
+  </section>
+
+  <section class="grid-2">
+    <div class="panel">
+      <h2>Top Absolute EV Setups</h2>
+      <div id="topTable"></div>
+    </div>
+    <div class="panel">
+      <h2>Best EV Efficiency</h2>
+      <div id="effTable"></div>
+      <div class="note">Absolute EV favors larger credits when win rate remains above break-even. EV efficiency shows the return per dollar of credit collected.</div>
+    </div>
+  </section>
+
+  <p class="footer">Source: wing-win.xlsx. Calculations use the supplied win rates and the stated stop loss of 2x credit.</p>
+</main>
+
+<script>
+const DATA = {"dateRange": "1/1/25 to 5/1/26", "credits": [0.5, 0.75, 1.0, 1.5, 2.0, 2.5, 3.0], "wings": [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55], "records": [{"strategy": "Bull Put", "wing": 5, "credit": 0.5, "win_rate": 66.28, "ev": -0.005799999999999916, "ev_pct_credit": -1.1599999999999833, "breakeven_margin": -0.38666666666665606}, {"strategy": "Bull Put", "wing": 5, "credit": 0.75, "win_rate": 65.33, "ev": -0.03007500000000002, "ev_pct_credit": -4.0100000000000025, "breakeven_margin": -1.336666666666659}, {"strategy": "Bull Put", "wing": 5, "credit": 1.0, "win_rate": 64.99, "ev": -0.05030000000000023, "ev_pct_credit": -5.030000000000023, "breakeven_margin": -1.6766666666666623}, {"strategy": "Bull Put", "wing": 5, "credit": 1.5, "win_rate": 59.74, "ev": -0.31169999999999964, "ev_pct_credit": -20.779999999999976, "breakeven_margin": -6.926666666666655}, {"strategy": "Bull Put", "wing": 5, "credit": 2.0, "win_rate": 50.59, "ev": -0.9645999999999999, "ev_pct_credit": -48.23, "breakeven_margin": -16.076666666666654}, {"strategy": "Bull Put", "wing": 5, "credit": 2.5, "win_rate": 41.16, "ev": -1.9130000000000003, "ev_pct_credit": -76.52000000000001, "breakeven_margin": -25.50666666666666}, {"strategy": "Bull Put", "wing": 5, "credit": 3.0, "win_rate": 32.46, "ev": -3.0786, "ev_pct_credit": -102.62, "breakeven_margin": -34.206666666666656}, {"strategy": "Bull Put", "wing": 10, "credit": 0.5, "win_rate": 67.83, "ev": 0.017449999999999966, "ev_pct_credit": 3.489999999999993, "breakeven_margin": 1.163333333333341}, {"strategy": "Bull Put", "wing": 10, "credit": 0.75, "win_rate": 67.11, "ev": 0.009975000000000067, "ev_pct_credit": 1.330000000000009, "breakeven_margin": 0.44333333333334224}, {"strategy": "Bull Put", "wing": 10, "credit": 1.0, "win_rate": 67.3, "ev": 0.018999999999999684, "ev_pct_credit": 1.8999999999999684, "breakeven_margin": 0.63333333333334}, {"strategy": "Bull Put", "wing": 10, "credit": 1.5, "win_rate": 63.1, "ev": -0.16049999999999998, "ev_pct_credit": -10.7, "breakeven_margin": -3.5666666666666558}, {"strategy": "Bull Put", "wing": 10, "credit": 2.0, "win_rate": 61.1, "ev": -0.3340000000000001, "ev_pct_credit": -16.700000000000003, "breakeven_margin": -5.566666666666656}, {"strategy": "Bull Put", "wing": 10, "credit": 2.5, "win_rate": 60.4, "ev": -0.4700000000000004, "ev_pct_credit": -18.80000000000002, "breakeven_margin": -6.266666666666659}, {"strategy": "Bull Put", "wing": 10, "credit": 3.0, "win_rate": 56.6, "ev": -0.9059999999999995, "ev_pct_credit": -30.19999999999998, "breakeven_margin": -10.066666666666656}, {"strategy": "Bull Put", "wing": 15, "credit": 0.5, "win_rate": 68.59, "ev": 0.028850000000000042, "ev_pct_credit": 5.7700000000000085, "breakeven_margin": 1.9233333333333462}, {"strategy": "Bull Put", "wing": 15, "credit": 0.75, "win_rate": 68.43, "ev": 0.03967500000000013, "ev_pct_credit": 5.290000000000017, "breakeven_margin": 1.7633333333333496}, {"strategy": "Bull Put", "wing": 15, "credit": 1.0, "win_rate": 68.5, "ev": 0.05500000000000016, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, {"strategy": "Bull Put", "wing": 15, "credit": 1.5, "win_rate": 66.2, "ev": -0.020999999999999686, "ev_pct_credit": -1.399999999999979, "breakeven_margin": -0.46666666666665435}, {"strategy": "Bull Put", "wing": 15, "credit": 2.0, "win_rate": 64.5, "ev": -0.1299999999999999, "ev_pct_credit": -6.499999999999995, "breakeven_margin": -2.166666666666657}, {"strategy": "Bull Put", "wing": 15, "credit": 2.5, "win_rate": 63.2, "ev": -0.26000000000000023, "ev_pct_credit": -10.40000000000001, "breakeven_margin": -3.4666666666666544}, {"strategy": "Bull Put", "wing": 15, "credit": 3.0, "win_rate": 61.6, "ev": -0.4560000000000004, "ev_pct_credit": -15.200000000000014, "breakeven_margin": -5.066666666666656}, {"strategy": "Bull Put", "wing": 20, "credit": 0.5, "win_rate": 69.19, "ev": 0.03784999999999994, "ev_pct_credit": 7.569999999999988, "breakeven_margin": 2.5233333333333405}, {"strategy": "Bull Put", "wing": 20, "credit": 0.75, "win_rate": 68.61, "ev": 0.043725000000000014, "ev_pct_credit": 5.830000000000002, "breakeven_margin": 1.9433333333333422}, {"strategy": "Bull Put", "wing": 20, "credit": 1.0, "win_rate": 69.4, "ev": 0.0820000000000003, "ev_pct_credit": 8.20000000000003, "breakeven_margin": 2.7333333333333485}, {"strategy": "Bull Put", "wing": 20, "credit": 1.5, "win_rate": 69.3, "ev": 0.1184999999999996, "ev_pct_credit": 7.899999999999974, "breakeven_margin": 2.63333333333334}, {"strategy": "Bull Put", "wing": 20, "credit": 2.0, "win_rate": 66.8, "ev": 0.007999999999999119, "ev_pct_credit": 0.39999999999995595, "breakeven_margin": 0.13333333333333997}, {"strategy": "Bull Put", "wing": 20, "credit": 2.5, "win_rate": 65.5, "ev": -0.0874999999999998, "ev_pct_credit": -3.499999999999992, "breakeven_margin": -1.1666666666666572}, {"strategy": "Bull Put", "wing": 20, "credit": 3.0, "win_rate": 63.6, "ev": -0.27600000000000025, "ev_pct_credit": -9.200000000000008, "breakeven_margin": -3.0666666666666558}, {"strategy": "Bull Put", "wing": 25, "credit": 0.5, "win_rate": 69.88, "ev": 0.04820000000000002, "ev_pct_credit": 9.640000000000004, "breakeven_margin": 3.2133333333333383}, {"strategy": "Bull Put", "wing": 25, "credit": 0.75, "win_rate": 68.8, "ev": 0.04800000000000004, "ev_pct_credit": 6.400000000000006, "breakeven_margin": 2.13333333333334}, {"strategy": "Bull Put", "wing": 25, "credit": 1.0, "win_rate": 70.3, "ev": 0.10899999999999999, "ev_pct_credit": 10.899999999999999, "breakeven_margin": 3.63333333333334}, {"strategy": "Bull Put", "wing": 25, "credit": 1.5, "win_rate": 69.1, "ev": 0.10949999999999993, "ev_pct_credit": 7.299999999999995, "breakeven_margin": 2.433333333333337}, {"strategy": "Bull Put", "wing": 25, "credit": 2.0, "win_rate": 68.2, "ev": 0.09200000000000053, "ev_pct_credit": 4.600000000000026, "breakeven_margin": 1.5333333333333456}, {"strategy": "Bull Put", "wing": 25, "credit": 2.5, "win_rate": 66.8, "ev": 0.009999999999998899, "ev_pct_credit": 0.39999999999995595, "breakeven_margin": 0.13333333333333997}, {"strategy": "Bull Put", "wing": 25, "credit": 3.0, "win_rate": 65.7, "ev": -0.08699999999999974, "ev_pct_credit": -2.8999999999999915, "breakeven_margin": -0.9666666666666544}, {"strategy": "Bull Put", "wing": 30, "credit": 0.5, "win_rate": 70.41, "ev": 0.05614999999999992, "ev_pct_credit": 11.229999999999984, "breakeven_margin": 3.7433333333333394}, {"strategy": "Bull Put", "wing": 30, "credit": 0.75, "win_rate": 70.41, "ev": 0.08422499999999988, "ev_pct_credit": 11.229999999999984, "breakeven_margin": 3.7433333333333394}, {"strategy": "Bull Put", "wing": 30, "credit": 1.0, "win_rate": 70.1, "ev": 0.10299999999999976, "ev_pct_credit": 10.299999999999976, "breakeven_margin": 3.433333333333337}, {"strategy": "Bull Put", "wing": 30, "credit": 1.5, "win_rate": 70.2, "ev": 0.15900000000000047, "ev_pct_credit": 10.600000000000032, "breakeven_margin": 3.5333333333333456}, {"strategy": "Bull Put", "wing": 30, "credit": 2.0, "win_rate": 68.1, "ev": 0.08599999999999941, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bull Put", "wing": 30, "credit": 2.5, "win_rate": 67.4, "ev": 0.055000000000000604, "ev_pct_credit": 2.200000000000024, "breakeven_margin": 0.7333333333333485}, {"strategy": "Bull Put", "wing": 30, "credit": 3.0, "win_rate": 66.6, "ev": -0.0060000000000006715, "ev_pct_credit": -0.20000000000002238, "breakeven_margin": -0.06666666666666288}, {"strategy": "Bull Put", "wing": 35, "credit": 0.5, "win_rate": 71.13, "ev": 0.06694999999999984, "ev_pct_credit": 13.389999999999969, "breakeven_margin": 4.463333333333338}, {"strategy": "Bull Put", "wing": 35, "credit": 0.75, "win_rate": 69.67, "ev": 0.06757500000000005, "ev_pct_credit": 9.010000000000007, "breakeven_margin": 3.0033333333333445}, {"strategy": "Bull Put", "wing": 35, "credit": 1.0, "win_rate": 70.3, "ev": 0.10899999999999999, "ev_pct_credit": 10.899999999999999, "breakeven_margin": 3.63333333333334}, {"strategy": "Bull Put", "wing": 35, "credit": 1.5, "win_rate": 70.3, "ev": 0.16349999999999998, "ev_pct_credit": 10.899999999999999, "breakeven_margin": 3.63333333333334}, {"strategy": "Bull Put", "wing": 35, "credit": 2.0, "win_rate": 69.4, "ev": 0.1640000000000006, "ev_pct_credit": 8.20000000000003, "breakeven_margin": 2.7333333333333485}, {"strategy": "Bull Put", "wing": 35, "credit": 2.5, "win_rate": 68.5, "ev": 0.1375000000000004, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, {"strategy": "Bull Put", "wing": 35, "credit": 3.0, "win_rate": 67.1, "ev": 0.0389999999999997, "ev_pct_credit": 1.29999999999999, "breakeven_margin": 0.4333333333333371}, {"strategy": "Bull Put", "wing": 40, "credit": 0.5, "win_rate": 71.78, "ev": 0.07669999999999999, "ev_pct_credit": 15.339999999999998, "breakeven_margin": 5.113333333333344}, {"strategy": "Bull Put", "wing": 40, "credit": 0.75, "win_rate": 70.01, "ev": 0.07522500000000021, "ev_pct_credit": 10.030000000000028, "breakeven_margin": 3.343333333333348}, {"strategy": "Bull Put", "wing": 40, "credit": 1.0, "win_rate": 70.5, "ev": 0.11499999999999977, "ev_pct_credit": 11.499999999999977, "breakeven_margin": 3.833333333333343}, {"strategy": "Bull Put", "wing": 40, "credit": 1.5, "win_rate": 70.8, "ev": 0.1859999999999995, "ev_pct_credit": 12.399999999999967, "breakeven_margin": 4.13333333333334}, {"strategy": "Bull Put", "wing": 40, "credit": 2.0, "win_rate": 69.8, "ev": 0.18799999999999972, "ev_pct_credit": 9.399999999999986, "breakeven_margin": 3.13333333333334}, {"strategy": "Bull Put", "wing": 40, "credit": 2.5, "win_rate": 69.0, "ev": 0.1749999999999996, "ev_pct_credit": 6.999999999999984, "breakeven_margin": 2.333333333333343}, {"strategy": "Bull Put", "wing": 40, "credit": 3.0, "win_rate": 68.1, "ev": 0.12899999999999912, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bull Put", "wing": 45, "credit": 0.5, "win_rate": 72.21, "ev": 0.08314999999999984, "ev_pct_credit": 16.629999999999967, "breakeven_margin": 5.5433333333333366}, {"strategy": "Bull Put", "wing": 45, "credit": 0.75, "win_rate": 70.43, "ev": 0.08467500000000017, "ev_pct_credit": 11.290000000000022, "breakeven_margin": 3.7633333333333496}, {"strategy": "Bull Put", "wing": 45, "credit": 1.0, "win_rate": 70.9, "ev": 0.12700000000000022, "ev_pct_credit": 12.700000000000022, "breakeven_margin": 4.2333333333333485}, {"strategy": "Bull Put", "wing": 45, "credit": 1.5, "win_rate": 71.0, "ev": 0.19499999999999984, "ev_pct_credit": 12.99999999999999, "breakeven_margin": 4.333333333333343}, {"strategy": "Bull Put", "wing": 45, "credit": 2.0, "win_rate": 69.9, "ev": 0.19400000000000084, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 45, "credit": 2.5, "win_rate": 69.9, "ev": 0.24250000000000105, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 45, "credit": 3.0, "win_rate": 68.2, "ev": 0.1380000000000008, "ev_pct_credit": 4.600000000000026, "breakeven_margin": 1.5333333333333456}, {"strategy": "Bull Put", "wing": 50, "credit": 0.5, "win_rate": 72.48, "ev": 0.08719999999999994, "ev_pct_credit": 17.43999999999999, "breakeven_margin": 5.813333333333347}, {"strategy": "Bull Put", "wing": 50, "credit": 0.75, "win_rate": 70.93, "ev": 0.09592500000000026, "ev_pct_credit": 12.790000000000035, "breakeven_margin": 4.26333333333335}, {"strategy": "Bull Put", "wing": 50, "credit": 1.0, "win_rate": 71.1, "ev": 0.133, "ev_pct_credit": 13.3, "breakeven_margin": 4.433333333333337}, {"strategy": "Bull Put", "wing": 50, "credit": 1.5, "win_rate": 71.3, "ev": 0.20849999999999969, "ev_pct_credit": 13.899999999999979, "breakeven_margin": 4.63333333333334}, {"strategy": "Bull Put", "wing": 50, "credit": 2.0, "win_rate": 69.9, "ev": 0.19400000000000084, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 50, "credit": 2.5, "win_rate": 69.5, "ev": 0.2124999999999999, "ev_pct_credit": 8.499999999999996, "breakeven_margin": 2.833333333333343}, {"strategy": "Bull Put", "wing": 50, "credit": 3.0, "win_rate": 68.6, "ev": 0.1739999999999995, "ev_pct_credit": 5.799999999999983, "breakeven_margin": 1.9333333333333371}, {"strategy": "Bull Put", "wing": 55, "credit": 0.5, "win_rate": 72.68, "ev": 0.09020000000000028, "ev_pct_credit": 18.040000000000056, "breakeven_margin": 6.01333333333335}, {"strategy": "Bull Put", "wing": 55, "credit": 0.75, "win_rate": 71.08, "ev": 0.09930000000000005, "ev_pct_credit": 13.240000000000007, "breakeven_margin": 4.413333333333341}, {"strategy": "Bull Put", "wing": 55, "credit": 1.0, "win_rate": 71.5, "ev": 0.14500000000000002, "ev_pct_credit": 14.500000000000002, "breakeven_margin": 4.833333333333343}, {"strategy": "Bull Put", "wing": 55, "credit": 1.5, "win_rate": 71.1, "ev": 0.1995, "ev_pct_credit": 13.3, "breakeven_margin": 4.433333333333337}, {"strategy": "Bull Put", "wing": 55, "credit": 2.0, "win_rate": 70.0, "ev": 0.1999999999999993, "ev_pct_credit": 9.999999999999964, "breakeven_margin": 3.333333333333343}, {"strategy": "Bull Put", "wing": 55, "credit": 2.5, "win_rate": 69.5, "ev": 0.2124999999999999, "ev_pct_credit": 8.499999999999996, "breakeven_margin": 2.833333333333343}, {"strategy": "Bull Put", "wing": 55, "credit": 3.0, "win_rate": 69.1, "ev": 0.21899999999999986, "ev_pct_credit": 7.299999999999995, "breakeven_margin": 2.433333333333337}, {"strategy": "Bear Call", "wing": 5, "credit": 0.5, "win_rate": 65.61, "ev": -0.01584999999999992, "ev_pct_credit": -3.169999999999984, "breakeven_margin": -1.0566666666666578}, {"strategy": "Bear Call", "wing": 5, "credit": 0.75, "win_rate": 64.44, "ev": -0.050100000000000144, "ev_pct_credit": -6.680000000000019, "breakeven_margin": -2.2266666666666595}, {"strategy": "Bear Call", "wing": 5, "credit": 1.0, "win_rate": 63.76, "ev": -0.08720000000000017, "ev_pct_credit": -8.720000000000017, "breakeven_margin": -2.906666666666659}, {"strategy": "Bear Call", "wing": 5, "credit": 1.5, "win_rate": 60.09, "ev": -0.29595000000000005, "ev_pct_credit": -19.730000000000004, "breakeven_margin": -6.576666666666654}, {"strategy": "Bear Call", "wing": 5, "credit": 2.0, "win_rate": 51.05, "ev": -0.9370000000000003, "ev_pct_credit": -46.850000000000016, "breakeven_margin": -15.61666666666666}, {"strategy": "Bear Call", "wing": 5, "credit": 2.5, "win_rate": 43.2, "ev": -1.7599999999999993, "ev_pct_credit": -70.39999999999998, "breakeven_margin": -23.466666666666654}, {"strategy": "Bear Call", "wing": 5, "credit": 3.0, "win_rate": 34.44, "ev": -2.9004000000000003, "ev_pct_credit": -96.68, "breakeven_margin": -32.22666666666666}, {"strategy": "Bear Call", "wing": 10, "credit": 0.5, "win_rate": 66.88, "ev": 0.0031999999999998696, "ev_pct_credit": 0.6399999999999739, "breakeven_margin": 0.21333333333333826}, {"strategy": "Bear Call", "wing": 10, "credit": 0.75, "win_rate": 65.43, "ev": -0.027824999999999767, "ev_pct_credit": -3.709999999999969, "breakeven_margin": -1.2366666666666504}, {"strategy": "Bear Call", "wing": 10, "credit": 1.0, "win_rate": 65.3, "ev": -0.040999999999999925, "ev_pct_credit": -4.0999999999999925, "breakeven_margin": -1.36666666666666}, {"strategy": "Bear Call", "wing": 10, "credit": 1.5, "win_rate": 64.4, "ev": -0.10200000000000009, "ev_pct_credit": -6.800000000000006, "breakeven_margin": -2.2666666666666515}, {"strategy": "Bear Call", "wing": 10, "credit": 2.0, "win_rate": 63.9, "ev": -0.16599999999999993, "ev_pct_credit": -8.299999999999997, "breakeven_margin": -2.7666666666666586}, {"strategy": "Bear Call", "wing": 10, "credit": 2.5, "win_rate": 62.3, "ev": -0.3275, "ev_pct_credit": -13.100000000000001, "breakeven_margin": -4.36666666666666}, {"strategy": "Bear Call", "wing": 10, "credit": 3.0, "win_rate": 58.4, "ev": -0.7440000000000007, "ev_pct_credit": -24.800000000000022, "breakeven_margin": -8.266666666666659}, {"strategy": "Bear Call", "wing": 15, "credit": 0.5, "win_rate": 67.31, "ev": 0.009650000000000158, "ev_pct_credit": 1.9300000000000317, "breakeven_margin": 0.6433333333333451}, {"strategy": "Bear Call", "wing": 15, "credit": 0.75, "win_rate": 65.95, "ev": -0.016125000000000056, "ev_pct_credit": -2.1500000000000075, "breakeven_margin": -0.7166666666666544}, {"strategy": "Bear Call", "wing": 15, "credit": 1.0, "win_rate": 66.4, "ev": -0.008000000000000007, "ev_pct_credit": -0.8000000000000007, "breakeven_margin": -0.2666666666666515}, {"strategy": "Bear Call", "wing": 15, "credit": 1.5, "win_rate": 65.5, "ev": -0.05249999999999988, "ev_pct_credit": -3.499999999999992, "breakeven_margin": -1.1666666666666572}, {"strategy": "Bear Call", "wing": 15, "credit": 2.0, "win_rate": 64.8, "ev": -0.1120000000000001, "ev_pct_credit": -5.600000000000005, "breakeven_margin": -1.86666666666666}, {"strategy": "Bear Call", "wing": 15, "credit": 2.5, "win_rate": 65.6, "ev": -0.08000000000000063, "ev_pct_credit": -3.200000000000025, "breakeven_margin": -1.0666666666666629}, {"strategy": "Bear Call", "wing": 15, "credit": 3.0, "win_rate": 64.0, "ev": -0.2400000000000002, "ev_pct_credit": -8.000000000000007, "breakeven_margin": -2.666666666666657}, {"strategy": "Bear Call", "wing": 20, "credit": 0.5, "win_rate": 68.55, "ev": 0.028249999999999886, "ev_pct_credit": 5.649999999999977, "breakeven_margin": 1.88333333333334}, {"strategy": "Bear Call", "wing": 20, "credit": 0.75, "win_rate": 67.06, "ev": 0.008850000000000025, "ev_pct_credit": 1.1800000000000033, "breakeven_margin": 0.3933333333333451}, {"strategy": "Bear Call", "wing": 20, "credit": 1.0, "win_rate": 67.6, "ev": 0.02799999999999958, "ev_pct_credit": 2.799999999999958, "breakeven_margin": 0.9333333333333371}, {"strategy": "Bear Call", "wing": 20, "credit": 1.5, "win_rate": 66.9, "ev": 0.010500000000000176, "ev_pct_credit": 0.7000000000000117, "breakeven_margin": 0.2333333333333485}, {"strategy": "Bear Call", "wing": 20, "credit": 2.0, "win_rate": 66.8, "ev": 0.007999999999999119, "ev_pct_credit": 0.39999999999995595, "breakeven_margin": 0.13333333333333997}, {"strategy": "Bear Call", "wing": 20, "credit": 2.5, "win_rate": 66.1, "ev": -0.04250000000000087, "ev_pct_credit": -1.7000000000000348, "breakeven_margin": -0.5666666666666629}, {"strategy": "Bear Call", "wing": 20, "credit": 3.0, "win_rate": 65.6, "ev": -0.09600000000000075, "ev_pct_credit": -3.200000000000025, "breakeven_margin": -1.0666666666666629}, {"strategy": "Bear Call", "wing": 25, "credit": 0.5, "win_rate": 69.3, "ev": 0.03949999999999987, "ev_pct_credit": 7.899999999999974, "breakeven_margin": 2.63333333333334}, {"strategy": "Bear Call", "wing": 25, "credit": 0.75, "win_rate": 67.92, "ev": 0.028200000000000225, "ev_pct_credit": 3.76000000000003, "breakeven_margin": 1.2533333333333445}, {"strategy": "Bear Call", "wing": 25, "credit": 1.0, "win_rate": 68.1, "ev": 0.042999999999999705, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bear Call", "wing": 25, "credit": 1.5, "win_rate": 67.2, "ev": 0.02400000000000002, "ev_pct_credit": 1.6000000000000014, "breakeven_margin": 0.5333333333333456}, {"strategy": "Bear Call", "wing": 25, "credit": 2.0, "win_rate": 67.2, "ev": 0.03200000000000003, "ev_pct_credit": 1.6000000000000014, "breakeven_margin": 0.5333333333333456}, {"strategy": "Bear Call", "wing": 25, "credit": 2.5, "win_rate": 66.9, "ev": 0.017500000000000293, "ev_pct_credit": 0.7000000000000117, "breakeven_margin": 0.2333333333333485}, {"strategy": "Bear Call", "wing": 25, "credit": 3.0, "win_rate": 66.8, "ev": 0.011999999999998678, "ev_pct_credit": 0.39999999999995595, "breakeven_margin": 0.13333333333333997}, {"strategy": "Bear Call", "wing": 30, "credit": 0.5, "win_rate": 70.02, "ev": 0.05030000000000001, "ev_pct_credit": 10.060000000000002, "breakeven_margin": 3.353333333333339}, {"strategy": "Bear Call", "wing": 30, "credit": 0.75, "win_rate": 68.49, "ev": 0.04102499999999998, "ev_pct_credit": 5.469999999999997, "breakeven_margin": 1.8233333333333377}, {"strategy": "Bear Call", "wing": 30, "credit": 1.0, "win_rate": 68.4, "ev": 0.052000000000000046, "ev_pct_credit": 5.200000000000005, "breakeven_margin": 1.7333333333333485}, {"strategy": "Bear Call", "wing": 30, "credit": 1.5, "win_rate": 68.1, "ev": 0.06449999999999956, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bear Call", "wing": 30, "credit": 2.0, "win_rate": 67.9, "ev": 0.07399999999999984, "ev_pct_credit": 3.699999999999992, "breakeven_margin": 1.2333333333333485}, {"strategy": "Bear Call", "wing": 30, "credit": 2.5, "win_rate": 67.5, "ev": 0.06250000000000089, "ev_pct_credit": 2.5000000000000355, "breakeven_margin": 0.8333333333333428}, {"strategy": "Bear Call", "wing": 30, "credit": 3.0, "win_rate": 67.9, "ev": 0.11099999999999977, "ev_pct_credit": 3.699999999999992, "breakeven_margin": 1.2333333333333485}, {"strategy": "Bear Call", "wing": 35, "credit": 0.5, "win_rate": 70.44, "ev": 0.056599999999999984, "ev_pct_credit": 11.319999999999997, "breakeven_margin": 3.7733333333333405}, {"strategy": "Bear Call", "wing": 35, "credit": 0.75, "win_rate": 68.67, "ev": 0.045074999999999865, "ev_pct_credit": 6.009999999999982, "breakeven_margin": 2.0033333333333445}, {"strategy": "Bear Call", "wing": 35, "credit": 1.0, "win_rate": 68.1, "ev": 0.042999999999999705, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bear Call", "wing": 35, "credit": 1.5, "win_rate": 68.4, "ev": 0.07800000000000007, "ev_pct_credit": 5.200000000000005, "breakeven_margin": 1.7333333333333485}, {"strategy": "Bear Call", "wing": 35, "credit": 2.0, "win_rate": 68.0, "ev": 0.08000000000000007, "ev_pct_credit": 4.0000000000000036, "breakeven_margin": 1.3333333333333428}, {"strategy": "Bear Call", "wing": 35, "credit": 2.5, "win_rate": 68.2, "ev": 0.11500000000000066, "ev_pct_credit": 4.600000000000026, "breakeven_margin": 1.5333333333333456}, {"strategy": "Bear Call", "wing": 35, "credit": 3.0, "win_rate": 68.0, "ev": 0.1200000000000001, "ev_pct_credit": 4.0000000000000036, "breakeven_margin": 1.3333333333333428}, {"strategy": "Bear Call", "wing": 40, "credit": 0.5, "win_rate": 70.71, "ev": 0.06064999999999987, "ev_pct_credit": 12.129999999999974, "breakeven_margin": 4.0433333333333366}, {"strategy": "Bear Call", "wing": 40, "credit": 0.75, "win_rate": 68.92, "ev": 0.05070000000000008, "ev_pct_credit": 6.7600000000000104, "breakeven_margin": 2.2533333333333445}, {"strategy": "Bear Call", "wing": 40, "credit": 1.0, "win_rate": 68.5, "ev": 0.05500000000000016, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, {"strategy": "Bear Call", "wing": 40, "credit": 1.5, "win_rate": 68.6, "ev": 0.08699999999999974, "ev_pct_credit": 5.799999999999983, "breakeven_margin": 1.9333333333333371}, {"strategy": "Bear Call", "wing": 40, "credit": 2.0, "win_rate": 68.5, "ev": 0.11000000000000032, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, {"strategy": "Bear Call", "wing": 40, "credit": 2.5, "win_rate": 67.8, "ev": 0.08499999999999952, "ev_pct_credit": 3.399999999999981, "breakeven_margin": 1.13333333333334}, {"strategy": "Bear Call", "wing": 40, "credit": 3.0, "win_rate": 67.8, "ev": 0.10199999999999942, "ev_pct_credit": 3.399999999999981, "breakeven_margin": 1.13333333333334}, {"strategy": "Bear Call", "wing": 45, "credit": 0.5, "win_rate": 71.27, "ev": 0.06905000000000006, "ev_pct_credit": 13.810000000000011, "breakeven_margin": 4.603333333333339}, {"strategy": "Bear Call", "wing": 45, "credit": 0.75, "win_rate": 69.34, "ev": 0.06015000000000004, "ev_pct_credit": 8.020000000000005, "breakeven_margin": 2.673333333333346}, {"strategy": "Bear Call", "wing": 45, "credit": 1.0, "win_rate": 68.6, "ev": 0.05799999999999983, "ev_pct_credit": 5.799999999999983, "breakeven_margin": 1.9333333333333371}, {"strategy": "Bear Call", "wing": 45, "credit": 1.5, "win_rate": 69.0, "ev": 0.10499999999999976, "ev_pct_credit": 6.999999999999984, "breakeven_margin": 2.333333333333343}, {"strategy": "Bear Call", "wing": 45, "credit": 2.0, "win_rate": 68.7, "ev": 0.12199999999999989, "ev_pct_credit": 6.099999999999994, "breakeven_margin": 2.0333333333333456}, {"strategy": "Bear Call", "wing": 45, "credit": 2.5, "win_rate": 68.1, "ev": 0.10749999999999926, "ev_pct_credit": 4.2999999999999705, "breakeven_margin": 1.4333333333333371}, {"strategy": "Bear Call", "wing": 45, "credit": 3.0, "win_rate": 68.2, "ev": 0.1380000000000008, "ev_pct_credit": 4.600000000000026, "breakeven_margin": 1.5333333333333456}, {"strategy": "Bear Call", "wing": 50, "credit": 0.5, "win_rate": 71.74, "ev": 0.07609999999999983, "ev_pct_credit": 15.219999999999967, "breakeven_margin": 5.073333333333338}, {"strategy": "Bear Call", "wing": 50, "credit": 0.75, "win_rate": 69.67, "ev": 0.06757500000000005, "ev_pct_credit": 9.010000000000007, "breakeven_margin": 3.0033333333333445}, {"strategy": "Bear Call", "wing": 50, "credit": 1.0, "win_rate": 69.3, "ev": 0.07899999999999974, "ev_pct_credit": 7.899999999999974, "breakeven_margin": 2.63333333333334}, {"strategy": "Bear Call", "wing": 50, "credit": 1.5, "win_rate": 69.3, "ev": 0.1184999999999996, "ev_pct_credit": 7.899999999999974, "breakeven_margin": 2.63333333333334}, {"strategy": "Bear Call", "wing": 50, "credit": 2.0, "win_rate": 69.1, "ev": 0.1459999999999999, "ev_pct_credit": 7.299999999999995, "breakeven_margin": 2.433333333333337}, {"strategy": "Bear Call", "wing": 50, "credit": 2.5, "win_rate": 68.5, "ev": 0.1375000000000004, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, {"strategy": "Bear Call", "wing": 50, "credit": 3.0, "win_rate": 68.2, "ev": 0.1380000000000008, "ev_pct_credit": 4.600000000000026, "breakeven_margin": 1.5333333333333456}, {"strategy": "Bear Call", "wing": 55, "credit": 0.5, "win_rate": 71.98, "ev": 0.07969999999999988, "ev_pct_credit": 15.939999999999976, "breakeven_margin": 5.313333333333347}, {"strategy": "Bear Call", "wing": 55, "credit": 0.75, "win_rate": 69.95, "ev": 0.07387500000000002, "ev_pct_credit": 9.850000000000003, "breakeven_margin": 3.2833333333333456}, {"strategy": "Bear Call", "wing": 55, "credit": 1.0, "win_rate": 68.8, "ev": 0.06400000000000006, "ev_pct_credit": 6.400000000000006, "breakeven_margin": 2.13333333333334}, {"strategy": "Bear Call", "wing": 55, "credit": 1.5, "win_rate": 69.2, "ev": 0.1140000000000001, "ev_pct_credit": 7.600000000000007, "breakeven_margin": 2.5333333333333456}, {"strategy": "Bear Call", "wing": 55, "credit": 2.0, "win_rate": 69.3, "ev": 0.15799999999999947, "ev_pct_credit": 7.899999999999974, "breakeven_margin": 2.63333333333334}, {"strategy": "Bear Call", "wing": 55, "credit": 2.5, "win_rate": 68.7, "ev": 0.15249999999999986, "ev_pct_credit": 6.099999999999994, "breakeven_margin": 2.0333333333333456}, {"strategy": "Bear Call", "wing": 55, "credit": 3.0, "win_rate": 68.5, "ev": 0.16500000000000048, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}], "topAbsolute": [{"strategy": "Bull Put", "wing": 45, "credit": 2.5, "win_rate": 69.9, "ev": 0.24250000000000105, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 55, "credit": 3.0, "win_rate": 69.1, "ev": 0.21899999999999986, "ev_pct_credit": 7.299999999999995, "breakeven_margin": 2.433333333333337}, {"strategy": "Bull Put", "wing": 50, "credit": 2.5, "win_rate": 69.5, "ev": 0.2124999999999999, "ev_pct_credit": 8.499999999999996, "breakeven_margin": 2.833333333333343}, {"strategy": "Bull Put", "wing": 55, "credit": 2.5, "win_rate": 69.5, "ev": 0.2124999999999999, "ev_pct_credit": 8.499999999999996, "breakeven_margin": 2.833333333333343}, {"strategy": "Bull Put", "wing": 50, "credit": 1.5, "win_rate": 71.3, "ev": 0.20849999999999969, "ev_pct_credit": 13.899999999999979, "breakeven_margin": 4.63333333333334}, {"strategy": "Bull Put", "wing": 55, "credit": 2.0, "win_rate": 70.0, "ev": 0.1999999999999993, "ev_pct_credit": 9.999999999999964, "breakeven_margin": 3.333333333333343}, {"strategy": "Bull Put", "wing": 55, "credit": 1.5, "win_rate": 71.1, "ev": 0.1995, "ev_pct_credit": 13.3, "breakeven_margin": 4.433333333333337}, {"strategy": "Bull Put", "wing": 45, "credit": 1.5, "win_rate": 71.0, "ev": 0.19499999999999984, "ev_pct_credit": 12.99999999999999, "breakeven_margin": 4.333333333333343}, {"strategy": "Bull Put", "wing": 45, "credit": 2.0, "win_rate": 69.9, "ev": 0.19400000000000084, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 50, "credit": 2.0, "win_rate": 69.9, "ev": 0.19400000000000084, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, {"strategy": "Bull Put", "wing": 40, "credit": 2.0, "win_rate": 69.8, "ev": 0.18799999999999972, "ev_pct_credit": 9.399999999999986, "breakeven_margin": 3.13333333333334}, {"strategy": "Bull Put", "wing": 40, "credit": 1.5, "win_rate": 70.8, "ev": 0.1859999999999995, "ev_pct_credit": 12.399999999999967, "breakeven_margin": 4.13333333333334}], "topEfficiency": [{"strategy": "Bull Put", "wing": 55, "credit": 0.5, "win_rate": 72.68, "ev": 0.09020000000000028, "ev_pct_credit": 18.040000000000056, "breakeven_margin": 6.01333333333335}, {"strategy": "Bull Put", "wing": 50, "credit": 0.5, "win_rate": 72.48, "ev": 0.08719999999999994, "ev_pct_credit": 17.43999999999999, "breakeven_margin": 5.813333333333347}, {"strategy": "Bull Put", "wing": 45, "credit": 0.5, "win_rate": 72.21, "ev": 0.08314999999999984, "ev_pct_credit": 16.629999999999967, "breakeven_margin": 5.5433333333333366}, {"strategy": "Bear Call", "wing": 55, "credit": 0.5, "win_rate": 71.98, "ev": 0.07969999999999988, "ev_pct_credit": 15.939999999999976, "breakeven_margin": 5.313333333333347}, {"strategy": "Bull Put", "wing": 40, "credit": 0.5, "win_rate": 71.78, "ev": 0.07669999999999999, "ev_pct_credit": 15.339999999999998, "breakeven_margin": 5.113333333333344}, {"strategy": "Bear Call", "wing": 50, "credit": 0.5, "win_rate": 71.74, "ev": 0.07609999999999983, "ev_pct_credit": 15.219999999999967, "breakeven_margin": 5.073333333333338}, {"strategy": "Bull Put", "wing": 55, "credit": 1.0, "win_rate": 71.5, "ev": 0.14500000000000002, "ev_pct_credit": 14.500000000000002, "breakeven_margin": 4.833333333333343}, {"strategy": "Bull Put", "wing": 50, "credit": 1.5, "win_rate": 71.3, "ev": 0.20849999999999969, "ev_pct_credit": 13.899999999999979, "breakeven_margin": 4.63333333333334}], "best": {"strategy": "Bull Put", "wing": 45, "credit": 2.5, "win_rate": 69.9, "ev": 0.24250000000000105, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}, "bestByStrategy": {"Bear Call": {"strategy": "Bear Call", "wing": 55, "credit": 3.0, "win_rate": 68.5, "ev": 0.16500000000000048, "ev_pct_credit": 5.500000000000016, "breakeven_margin": 1.8333333333333428}, "Bull Put": {"strategy": "Bull Put", "wing": 45, "credit": 2.5, "win_rate": 69.9, "ev": 0.24250000000000105, "ev_pct_credit": 9.700000000000042, "breakeven_margin": 3.2333333333333485}}, "positiveExpectancy": {"strategy": "All", "positive_count": 114, "total_count": 154, "positive_share": 74.02597402597402, "positive_expectancy": 0.09221885964912277, "positive_expectancy_pct_credit": 7.299473684210525, "avg_positive_win_rate": 69.09982456140351, "best_positive_ev": 0.24250000000000105}, "positiveExpectancyByStrategy": [{"strategy": "Bear Call", "positive_count": 56, "total_count": 77, "positive_share": 72.72727272727273, "positive_expectancy": 0.07259732142857137, "positive_expectancy_pct_credit": 5.656428571428566, "avg_positive_win_rate": 68.55214285714285, "best_positive_ev": 0.16500000000000048}, {"strategy": "Bull Put", "positive_count": 58, "total_count": 77, "positive_share": 75.32467532467533, "positive_expectancy": 0.11116379310344826, "positive_expectancy_pct_credit": 8.885862068965517, "avg_positive_win_rate": 69.62862068965518, "best_positive_ev": 0.24250000000000105}], "stats": {"positiveCount": 114, "totalCount": 154, "breakevenWinRate": 66.66666666666666, "avgEv": -0.046344642857142904, "positiveExpectancy": 0.09221885964912277, "positiveExpectancyPctCredit": 7.299473684210525, "bestEv": 0.24250000000000105, "bestWinRate": 72.68}};
+
+const money = v => `$${v.toFixed(3)}`;
+const pct = v => `${v.toFixed(2)}%`;
+const credit = v => `$${Number(v).toFixed(2)}`;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+
+function colorFor(value, min, max) {
+  const mid = 0;
+  const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+  const mix = (a, b, t) => Math.round(a + (b - a) * t);
+  const neg = [201, 79, 79], neutral = [246, 243, 234], pos = [33, 141, 104];
+  let from, to, t;
+  if (value < mid) {
+    from = neg; to = neutral; t = clamp((value - min) / (mid - min || 1), 0, 1);
+  } else {
+    from = neutral; to = pos; t = clamp(value / (max || 1), 0, 1);
+  }
+  return `rgb(${mix(from[0], to[0], t)}, ${mix(from[1], to[1], t)}, ${mix(from[2], to[2], t)})`;
+}
+
+function renderCards() {
+  const best = DATA.best;
+  const callBest = DATA.bestByStrategy["Bear Call"];
+  const putBest = DATA.bestByStrategy["Bull Put"];
+  const cards = [
+    {
+      h: "Optimum setup",
+      v: `${best.strategy}`,
+      d: `${best.wing}-point wing, ${credit(best.credit)} credit, EV ${money(best.ev)}`,
+      p: `Win rate ${pct(best.win_rate)}`
+    },
+    {
+      h: "Best bull put",
+      v: `${putBest.wing} / ${credit(putBest.credit)}`,
+      d: `EV ${money(putBest.ev)} at ${pct(putBest.win_rate)} win rate`,
+      p: `${pct(putBest.breakeven_margin)} above break-even`
+    },
+    {
+      h: "Best bear call",
+      v: `${callBest.wing} / ${credit(callBest.credit)}`,
+      d: `EV ${money(callBest.ev)} at ${pct(callBest.win_rate)} win rate`,
+      p: `${pct(callBest.breakeven_margin)} above break-even`
+    },
+    {
+      h: "Positive EV cells",
+      v: `${DATA.stats.positiveCount} / ${DATA.stats.totalCount}`,
+      d: `Positive expectancy: ${money(DATA.stats.positiveExpectancy)} avg EV`,
+      p: `${pct(DATA.positiveExpectancy.positive_share)} of tested cells`
+    },
+    {
+      h: "EV efficiency",
+      v: `${pct(DATA.stats.positiveExpectancyPctCredit)}`,
+      d: `Average EV / credit across positive-EV setups`,
+      p: `All-cell average EV ${money(DATA.stats.avgEv)}`
+    }
+  ];
+  document.getElementById("summaryCards").innerHTML = cards.map(c => `
+    <article class="card">
+      <h3>${esc(c.h)}</h3>
+      <div class="value">${esc(c.v)}</div>
+      <div class="detail">${esc(c.d)}</div>
+      <div style="margin-top:12px"><span class="pill good">${esc(c.p)}</span></div>
+    </article>`).join("");
+}
+
+function renderHeatmap(targetId, strategy) {
+  const records = DATA.records.filter(r => r.strategy === strategy);
+  const min = Math.min(...DATA.records.map(r => r.ev));
+  const max = Math.max(...DATA.records.map(r => r.ev));
+  const left = 76, top = 48, cw = 76, ch = 48;
+  const width = left + DATA.credits.length * cw + 18;
+  const height = top + DATA.wings.length * ch + 42;
+  const byKey = new Map(records.map(r => [`${r.wing}|${r.credit}`, r]));
+  let svg = `<svg class="heatmap" viewBox="0 0 ${width} ${height}" role="img" aria-label="${strategy} expected value heatmap">`;
+  svg += `<text x="${left + DATA.credits.length * cw / 2}" y="20" class="axis" text-anchor="middle">Credit collected</text>`;
+  svg += `<text x="16" y="${top + DATA.wings.length * ch / 2}" class="axis" text-anchor="middle" transform="rotate(-90 16 ${top + DATA.wings.length * ch / 2})">Wing size</text>`;
+  DATA.credits.forEach((c, j) => svg += `<text x="${left + j*cw + cw/2}" y="${top - 14}" class="axis" text-anchor="middle">${credit(c)}</text>`);
+  DATA.wings.forEach((w, i) => svg += `<text x="${left - 18}" y="${top + i*ch + ch/2 + 4}" class="axis" text-anchor="end">${w}</text>`);
+  DATA.wings.forEach((w, i) => DATA.credits.forEach((c, j) => {
+    const r = byKey.get(`${w}|${c}`);
+    const x = left + j*cw, y = top + i*ch;
+    const stroke = r.ev === DATA.best.ev && r.strategy === DATA.best.strategy && r.wing === DATA.best.wing && r.credit === DATA.best.credit ? "#11283f" : "rgba(255,255,255,.8)";
+    const sw = stroke === "#11283f" ? 3 : 1;
+    svg += `<rect x="${x}" y="${y}" width="${cw-3}" height="${ch-3}" rx="6" fill="${colorFor(r.ev, min, max)}" stroke="${stroke}" stroke-width="${sw}"><title>${strategy} | wing ${w} | credit ${credit(c)} | EV ${money(r.ev)} | win rate ${pct(r.win_rate)}</title></rect>`;
+    svg += `<text x="${x + cw/2 - 1.5}" y="${y + 18}" class="cell-text">${money(r.ev)}</text>`;
+    svg += `<text x="${x + cw/2 - 1.5}" y="${y + 34}" class="cell-subtext">${pct(r.win_rate)}</text>`;
+  }));
+  svg += `</svg>`;
+  document.getElementById(targetId).innerHTML = svg;
+}
+
+function renderScatter() {
+  const records = DATA.records;
+  const margin = {left: 62, right: 28, top: 22, bottom: 48};
+  const width = 1200, height = 420;
+  const innerW = width - margin.left - margin.right;
+  const innerH = height - margin.top - margin.bottom;
+  const xMin = 0, xMax = Math.max(...DATA.wings) + 4;
+  const yMin = Math.min(...records.map(r => r.ev)) - 0.02;
+  const yMax = Math.max(...records.map(r => r.ev)) + 0.04;
+  const sx = x => margin.left + (x - xMin) / (xMax - xMin) * innerW;
+  const sy = y => margin.top + innerH - (y - yMin) / (yMax - yMin) * innerH;
+  const zeroY = sy(0);
+  let svg = `<svg class="heatmap" viewBox="0 0 ${width} ${height}" role="img" aria-label="Expected value by wing size and strategy">`;
+  svg += `<rect x="0" y="0" width="${width}" height="${height}" fill="#fff"/>`;
+  for (let i = 0; i <= 5; i++) {
+    const yv = yMin + (yMax - yMin) * i / 5;
+    const y = sy(yv);
+    svg += `<line x1="${margin.left}" x2="${width-margin.right}" y1="${y}" y2="${y}" stroke="#e3e8f0"/>`;
+    svg += `<text x="${margin.left - 10}" y="${y + 4}" class="axis" text-anchor="end">${money(yv)}</text>`;
+  }
+  DATA.wings.forEach(w => {
+    const x = sx(w);
+    svg += `<line x1="${x}" x2="${x}" y1="${margin.top}" y2="${height-margin.bottom}" stroke="#f0f3f7"/>`;
+    svg += `<text x="${x}" y="${height - 20}" class="axis" text-anchor="middle">${w}</text>`;
+  });
+  svg += `<line x1="${margin.left}" x2="${width-margin.right}" y1="${zeroY}" y2="${zeroY}" stroke="#6f7c8e" stroke-dasharray="6 5"/>`;
+  svg += `<text x="${width-margin.right}" y="${zeroY - 8}" class="axis" text-anchor="end">EV break-even</text>`;
+  records.forEach(r => {
+    const x = sx(r.wing) + (r.strategy === "Bull Put" ? -5 : 5);
+    const y = sy(r.ev);
+    const radius = 4 + r.credit * 2.2;
+    const fill = r.strategy === "Bull Put" ? "rgba(21,132,95,.72)" : "rgba(183,121,31,.70)";
+    const stroke = r.ev === DATA.best.ev && r.strategy === DATA.best.strategy && r.wing === DATA.best.wing && r.credit === DATA.best.credit ? "#11283f" : "rgba(255,255,255,.92)";
+    svg += `<circle cx="${x}" cy="${y}" r="${radius}" fill="${fill}" stroke="${stroke}" stroke-width="2"><title>${r.strategy} | wing ${r.wing} | credit ${credit(r.credit)} | EV ${money(r.ev)} | win ${pct(r.win_rate)}</title></circle>`;
+  });
+  svg += `<text x="${margin.left + innerW / 2}" y="${height - 4}" class="axis" text-anchor="middle">Wing size</text>`;
+  svg += `<text x="18" y="${margin.top + innerH / 2}" class="axis" text-anchor="middle" transform="rotate(-90 18 ${margin.top + innerH / 2})">Expected value per spread</text>`;
+  svg += `</svg>`;
+  document.getElementById("scatter").innerHTML = svg;
+}
+
+function renderTable(targetId, rows) {
+  const html = `<table>
+    <thead><tr><th>Strategy</th><th>Setup</th><th>Win rate</th><th>EV</th><th>EV / credit</th><th>Margin</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr class="${r.strategy === DATA.best.strategy && r.wing === DATA.best.wing && r.credit === DATA.best.credit ? "best-row" : ""}">
+        <td>${esc(r.strategy)}</td>
+        <td>${r.wing} wing / ${credit(r.credit)}</td>
+        <td>${pct(r.win_rate)}</td>
+        <td class="${r.ev >= 0 ? "positive" : "negative"}">${money(r.ev)}</td>
+        <td class="${r.ev_pct_credit >= 0 ? "positive" : "negative"}">${pct(r.ev_pct_credit)}</td>
+        <td class="${r.breakeven_margin >= 0 ? "positive" : "negative"}">${pct(r.breakeven_margin)}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+  document.getElementById(targetId).innerHTML = html;
+}
+
+function renderPositiveExpectancyTable() {
+  const rows = [DATA.positiveExpectancy, ...DATA.positiveExpectancyByStrategy];
+  const html = `<table>
+    <thead><tr><th>Scope</th><th>Positive cells</th><th>Positive share</th><th>Positive expectancy</th><th>Avg EV / credit</th><th>Avg win rate</th><th>Best EV</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr>
+        <td>${esc(r.strategy)}</td>
+        <td>${r.positive_count} / ${r.total_count}</td>
+        <td class="positive">${pct(r.positive_share)}</td>
+        <td class="positive">${money(r.positive_expectancy)}</td>
+        <td class="positive">${pct(r.positive_expectancy_pct_credit)}</td>
+        <td>${pct(r.avg_positive_win_rate)}</td>
+        <td class="positive">${money(r.best_positive_ev)}</td>
+      </tr>`).join("")}</tbody>
+  </table>`;
+  document.getElementById("positiveExpectancyTable").innerHTML = html;
+}
+
+renderCards();
+renderHeatmap("putHeatmap", "Bull Put");
+renderHeatmap("callHeatmap", "Bear Call");
+renderScatter();
+renderPositiveExpectancyTable();
+renderTable("topTable", DATA.topAbsolute);
+renderTable("effTable", DATA.topEfficiency);
+</script>
+</body>
+</html>
