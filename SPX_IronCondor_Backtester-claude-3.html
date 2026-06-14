@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX Iron Condor Backtester</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#21262d;
+  --border:#30363d;--border2:#444c56;
+  --text:#e6edf3;--text2:#8b949e;--text3:#6e7681;
+  --accent:#58a6ff;--accent2:#1f6feb;
+  --green:#3fb950;--green2:#196c2e;--green3:#0d4429;
+  --red:#f85149;--red2:#8b1a1a;--red3:#3d0c0c;
+  --amber:#d29922;
+  --font:'JetBrains Mono','Fira Code','Courier New',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;line-height:1.5;}
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+header h1{font-size:15px;font-weight:600;letter-spacing:.5px;}
+header span{font-size:11px;color:var(--text3);background:var(--bg4);border:1px solid var(--border);padding:3px 10px;border-radius:12px;}
+.layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 49px);overflow:hidden;}
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.main{overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;}
+.section-label{font-size:10px;font-weight:600;letter-spacing:1.2px;color:var(--text3);text-transform:uppercase;margin-bottom:5px;}
+.ctrl{display:flex;flex-direction:column;gap:4px;}
+.ctrl label{font-size:11px;color:var(--text2);}
+select,input[type=date]{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12px;appearance:none;cursor:pointer;}
+select:focus,input:focus{outline:none;border-color:var(--accent);}
+input[type=range]{width:100%;padding:3px 0;accent-color:var(--accent);}
+.pills{display:flex;flex-wrap:wrap;gap:4px;}
+.pill{font-size:11px;padding:3px 9px;border-radius:12px;border:1px solid var(--border);cursor:pointer;transition:all .15s;color:var(--text2);background:var(--bg3);user-select:none;}
+.pill.on{background:var(--accent2);border-color:var(--accent);color:var(--text);}
+.pill:hover:not(.on){border-color:var(--border2);color:var(--text);}
+.btn-run{width:100%;padding:10px;background:var(--accent2);border:1px solid var(--accent);color:var(--text);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-run:hover{background:var(--accent);}
+.btn-run:disabled{opacity:.5;cursor:wait;}
+.mrow{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+.mc .ml{font-size:10px;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:3px;}
+.mc .mv{font-size:21px;font-weight:600;font-family:var(--font);}
+.mc .ms{font-size:10px;color:var(--text3);margin-top:2px;}
+.pos{color:var(--green)!important;}.neg{color:var(--red)!important;}.warn{color:var(--amber)!important;}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;}
+.cc h3{font-size:10px;font-weight:600;color:var(--text3);margin-bottom:10px;letter-spacing:.8px;text-transform:uppercase;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.tw{overflow-x:auto;max-height:360px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;font-family:var(--font);}
+th{background:var(--bg3);color:var(--text3);font-size:10px;letter-spacing:.6px;text-transform:uppercase;padding:7px 9px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;white-space:nowrap;}
+th.s{cursor:pointer;}th.s:hover{color:var(--text);}
+td{padding:6px 9px;border-bottom:1px solid var(--border);color:var(--text2);white-space:nowrap;}
+tr:hover td{background:var(--bg3);}
+.bw{display:inline-block;font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;}
+.bw.w{background:var(--green3);color:var(--green);border:1px solid var(--green2);}
+.bw.l{background:var(--red3);color:var(--red);border:1px solid var(--red2);}
+.bw.b{background:#0d2d4a;color:var(--accent);border:1px solid var(--accent2);}
+#dz{border:2px dashed var(--border2);border-radius:10px;padding:22px 12px;text-align:center;cursor:pointer;background:var(--bg3);}
+#dz:hover,#dz.drag{border-color:var(--accent);background:#0d1f3c;}
+#dz p{color:var(--text3);font-size:11px;}
+#flist{display:flex;flex-direction:column;gap:3px;margin-top:6px;}
+.fi{display:flex;align-items:center;justify-content:space-between;padding:3px 7px;background:var(--bg3);border-radius:5px;font-size:11px;font-family:var(--font);}
+.fi .fn{color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:155px;}
+.fi .fc{color:var(--text3);}
+.fi .fx{cursor:pointer;color:var(--text3);padding:0 4px;}
+.fi .fx:hover{color:var(--red);}
+#sb{font-size:11px;color:var(--text3);padding:2px 0;min-height:16px;}
+#sb.ok{color:var(--green);}#sb.err{color:var(--red);}
+.rbox{background:#0d2d1a;border:1px solid var(--green2);border-radius:8px;padding:12px 14px;}
+.rbox h3{color:var(--green);font-size:10px;font-weight:600;margin-bottom:7px;text-transform:uppercase;letter-spacing:.8px;}
+.rbox p{color:var(--text2);font-size:12px;line-height:1.8;}
+.rt{display:inline-block;background:#0a4020;border:1px solid var(--green2);border-radius:4px;padding:0 6px;font-size:10px;font-family:var(--font);color:var(--green);margin:1px;}
+.rt.bad{background:var(--red3);border-color:var(--red2);color:var(--red);}
+hr.div{border:none;border-top:1px solid var(--border);margin:0;}
+.empty{text-align:center;padding:80px 20px;color:var(--text3);}
+.empty .ei{font-size:38px;margin-bottom:10px;opacity:.5;}
+code{background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:11px;font-family:var(--font);}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>⬡ SPX IRON CONDOR BACKTESTER</h1>
+  <span id="ds">No data loaded</span>
+</header>
+<div class="layout">
+<div class="sidebar">
+  <div>
+    <div class="section-label">Data Files</div>
+    <div id="dz" onclick="document.getElementById('fi').click()">
+      <div style="font-size:24px;margin-bottom:5px">📁</div>
+      <p>Drop <code>Trades*.csv</code> files here<br>or click to browse</p>
+    </div>
+    <input type="file" id="fi" accept=".csv" multiple style="display:none">
+    <div id="flist"></div>
+    <div id="sb"></div>
+  </div>
+  <hr class="div">
+  <div>
+    <div class="section-label">Strategy</div>
+    <div class="ctrl">
+      <label>Option side</label>
+      <div class="pills" id="pSide">
+        <span class="pill on" data-v="both">Both</span>
+        <span class="pill" data-v="P">Put only</span>
+        <span class="pill" data-v="C">Call only</span>
+      </div>
+    </div>
+  </div>
+  <div class="ctrl"><label>Wing sizes (pts)</label><div class="pills" id="pWing"></div></div>
+  <div class="ctrl"><label>Credit levels ($)</label><div class="pills" id="pCredit"></div></div>
+  <div class="ctrl"><label>Stop loss multipliers</label><div class="pills" id="pSl"></div></div>
+  <hr class="div">
+  <div>
+    <div class="section-label">Time Filters</div>
+    <div class="ctrl">
+      <label>Days of week</label>
+      <div class="pills" id="pDow">
+        <span class="pill on" data-v="1">Mon</span>
+        <span class="pill on" data-v="2">Tue</span>
+        <span class="pill on" data-v="3">Wed</span>
+        <span class="pill on" data-v="4">Thu</span>
+        <span class="pill on" data-v="5">Fri</span>
+      </div>
+    </div>
+    <div class="ctrl" style="margin-top:8px">
+      <label>Entry time range</label>
+      <div style="display:flex;gap:5px;align-items:center">
+        <select id="tFrom" style="flex:1"></select>
+        <span style="color:var(--text3);font-size:10px">→</span>
+        <select id="tTo" style="flex:1"></select>
+      </div>
+    </div>
+  </div>
+  <hr class="div">
+  <div>
+    <div class="section-label">Lookback</div>
+    <div class="ctrl">
+      <label>Days back: <strong id="lbv" style="color:var(--accent)">365d</strong></label>
+      <input type="range" id="lb" min="30" max="500" value="365" step="5"
+        oninput="document.getElementById('lbv').textContent=this.value+'d'">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>30d</span><span>500d</span></div>
+    </div>
+    <div class="ctrl" style="margin-top:6px">
+      <label>Fixed range (overrides slider)</label>
+      <div style="display:flex;gap:5px;align-items:center">
+        <input type="date" id="dFrom" style="flex:1">
+        <span style="color:var(--text3);font-size:10px">→</span>
+        <input type="date" id="dTo" style="flex:1">
+      </div>
+    </div>
+  </div>
+  <hr class="div">
+  <div>
+    <div class="section-label">Position Sizing</div>
+    <div class="ctrl">
+      <label>Contracts: <strong id="cv" style="color:var(--accent)">1</strong></label>
+      <input type="range" id="ct" min="1" max="10" value="1" step="1"
+        oninput="document.getElementById('cv').textContent=this.value">
+    </div>
+    <div class="ctrl" style="margin-top:5px">
+      <label>Daily loss limit: <strong id="dlv" style="color:var(--amber)">Unlimited</strong></label>
+      <input type="range" id="dl" min="0" max="5000" value="0" step="100"
+        oninput="document.getElementById('dlv').textContent=+this.value===0?'Unlimited':'$'+this.value">
+    </div>
+  </div>
+  <button class="btn-run" id="runBtn" onclick="runBacktest()">▶ RUN BACKTEST</button>
+</div>
+
+<div class="main" id="main">
+  <div class="empty"><div class="ei">📈</div>
+    <p>Load your <code>Trades*.csv</code> files, configure filters, then run.<br>
+    <span style="font-size:11px">Drop more files at any time — data merges automatically.</span></p>
+  </div>
+</div>
+</div>
+
+<script>
+// ── Time map: canonical key -> display label ──────────────────────────────
+// Key format: "HH:MM" 24h zero-padded  (09:33, 15:45)
+// We normalise ALL entry times to this format on load.
+const TK = ['09:33','09:45','10:00','10:15','10:30','10:45','11:00','11:15',
+             '11:30','11:45','12:00','12:15','12:30','12:45','13:00','13:15',
+             '13:30','13:45','14:00','14:15','14:30','14:45','15:00','15:15','15:30','15:45'];
+const TL = ['9:33','9:45','10:00','10:15','10:30','10:45','11:00','11:15',
+            '11:30','11:45','12:00','12:15','12:30','12:45','1:00','1:15',
+            '1:30','1:45','2:00','2:15','2:30','2:45','3:00','3:15','3:30','3:45'];
+const TL12= ['9:33 AM','9:45 AM','10:00 AM','10:15 AM','10:30 AM','10:45 AM',
+             '11:00 AM','11:15 AM','11:30 AM','11:45 AM','12:00 PM','12:15 PM','12:30 PM','12:45 PM',
+             '1:00 PM','1:15 PM','1:30 PM','1:45 PM','2:00 PM','2:15 PM','2:30 PM','2:45 PM',
+             '3:00 PM','3:15 PM','3:30 PM','3:45 PM'];
+const DN={1:'Mon',2:'Tue',3:'Wed',4:'Thu',5:'Fri'};
+
+function padTime(h,m){ return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0'); }
+function tkLabel(tk){ const i=TK.indexOf(tk); return i>=0?TL[i]:tk; }
+
+// Build time selects
+(()=>{
+  const fEl=document.getElementById('tFrom'), tEl=document.getElementById('tTo');
+  TK.forEach((k,i)=>{ fEl.add(new Option(TL12[i],k)); tEl.add(new Option(TL12[i],k)); });
+  tEl.value='15:45';
+})();
+
+// ── Pill helpers ─────────────────────────────────────────────────────────
+document.getElementById('pSide').addEventListener('click',e=>{
+  if(!e.target.classList.contains('pill')) return;
+  document.querySelectorAll('#pSide .pill').forEach(p=>p.classList.remove('on'));
+  e.target.classList.add('on');
+});
+document.getElementById('pDow').addEventListener('click',e=>{
+  if(e.target.classList.contains('pill')) e.target.classList.toggle('on');
+});
+function activeVals(id){ return [...document.querySelectorAll('#'+id+' .pill.on')].map(p=>p.dataset.v); }
+function buildPills(id,vals,fmt){
+  const el=document.getElementById(id);
+  el.innerHTML=vals.map(v=>`<span class="pill on" data-v="${v}">${fmt(v)}</span>`).join('');
+  el.addEventListener('click',e=>{ if(e.target.classList.contains('pill')) e.target.classList.toggle('on'); });
+}
+
+// ── State ────────────────────────────────────────────────────────────────
+let allData=[], loadedFiles={}, charts={}, lastCombos=[], sortCol='netPL', sortDir=-1;
+
+function setStat(m,t=''){ const e=document.getElementById('sb'); e.textContent=m; e.className=t; }
+function updDS(){
+  const n=allData.length, f=Object.keys(loadedFiles).length;
+  document.getElementById('ds').textContent=n?n.toLocaleString()+' trades · '+f+' file'+(f>1?'s':''):'No data loaded';
+}
+
+// ── CSV parse ────────────────────────────────────────────────────────────
+function parseCSV(text){
+  const lines=text.split('\n');
+  if(lines.length<2) return [];
+  const hdrs=lines[0].split(',').map(h=>h.trim());
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const line=lines[i].trim(); if(!line) continue;
+    const vals=line.split(',');
+    const obj={}; hdrs.forEach((h,j)=>{ obj[h]=(vals[j]||'').trim(); });
+    if(obj.TradeID) out.push(obj);
+  }
+  return out;
+}
+
+function parseParams(name){
+  const m=name.match(/Trades-(\d+)-(\d+)-([^-.x]+)/i);
+  if(!m) return null;
+  const wing=+m[1], cr=+m[2];
+  const credit=cr===30?3.0:cr/10;
+  const sr=m[3];
+  const sl=sr==='1'?1:sr==='125'?1.25:sr==='150'?1.5:sr==='2'?2:sr==='3'?3:parseFloat(sr)||1;
+  return {wing,credit,sl};
+}
+
+function processRaw(raw,p,fname){
+  return raw.map(r=>{
+    const dt=new Date(r.EntryTime||'');
+    if(isNaN(dt)) return null;
+    const tk=padTime(dt.getHours(),dt.getMinutes());
+    if(!TK.includes(tk)) return null;   // skip non-standard intervals
+    const pl=parseFloat(r.ProfitLoss)||0;
+    const isWin=r.IsWin==='True'||r.Outcome==='Expiration';
+    return {
+      tk,                              // canonical time key "HH:MM"
+      optType:r.OptionType||'',
+      dow:dt.getDay(),
+      openDate:r.OpenDate||'',
+      pl, isWin,
+      premium:parseFloat(r.Premium)||0,
+      outcome:r.Outcome||'',
+      wing:p.wing, credit:p.credit, sl:p.sl,
+      fname
+    };
+  }).filter(Boolean);
+}
+
+async function addFiles(files){
+  for(const file of files){
+    const name=file.name;
+    if(!/^Trades/i.test(name)){ setStat('Skipped: '+name+' (bad name)','err'); continue; }
+    if(loadedFiles[name]){ setStat('Already loaded: '+name); continue; }
+    const p=parseParams(name);
+    if(!p){ setStat('Cannot parse params: '+name,'err'); continue; }
+    setStat('Loading '+name+'…');
+    try{
+      const text=await file.text();
+      const raw=parseCSV(text);
+      const rows=processRaw(raw,p,name);
+      loadedFiles[name]=rows;
+      allData=Object.values(loadedFiles).flat();
+      renderFList(); updatePills(); updDS();
+      setStat('Loaded '+name+' — '+rows.length.toLocaleString()+' trades','ok');
+    }catch(e){ setStat('Error: '+e.message,'err'); console.error(e); }
+  }
+}
+
+function removeFile(n){
+  delete loadedFiles[n];
+  allData=Object.values(loadedFiles).flat();
+  renderFList(); updatePills(); updDS();
+}
+window.removeFile=removeFile;
+
+function renderFList(){
+  document.getElementById('flist').innerHTML=
+    Object.entries(loadedFiles).map(([n,r])=>
+      `<div class="fi">
+         <span class="fn" title="${n}">${n.replace('.csv','').replace(/^Trades-/,'')}</span>
+         <span class="fc">${r.length.toLocaleString()}</span>
+         <span class="fx" onclick="removeFile('${n}')">✕</span>
+       </div>`).join('');
+}
+
+function updatePills(){
+  const wings=[...new Set(allData.map(d=>d.wing))].sort((a,b)=>a-b);
+  const credits=[...new Set(allData.map(d=>d.credit))].sort((a,b)=>a-b);
+  const sls=[...new Set(allData.map(d=>d.sl))].sort((a,b)=>a-b);
+  buildPills('pWing',wings,v=>v+'pt');
+  buildPills('pCredit',credits,v=>'$'+v.toFixed(1));
+  buildPills('pSl',sls,v=>v+'x');
+}
+
+// ── Filters ──────────────────────────────────────────────────────────────
+function getF(){
+  return{
+    side:activeVals('pSide')[0]||'both',
+    wings:activeVals('pWing').map(Number),
+    credits:activeVals('pCredit').map(Number),
+    sls:activeVals('pSl').map(Number),
+    dows:activeVals('pDow').map(Number),
+    tFrom:document.getElementById('tFrom').value,
+    tTo:document.getElementById('tTo').value,
+    lookback:+document.getElementById('lb').value,
+    dFrom:document.getElementById('dFrom').value,
+    dTo:document.getElementById('dTo').value
+  };
+}
+
+function applyF(data,f){
+  const fi=TK.indexOf(f.tFrom), ti=TK.indexOf(f.tTo);
+  const useDR=f.dFrom&&f.dTo;
+  const cutoff=useDR?null:new Date(Date.now()-f.lookback*86400000).toISOString().slice(0,10);
+  return data.filter(d=>{
+    if(f.wings.length&&!f.wings.includes(d.wing)) return false;
+    if(f.credits.length&&!f.credits.some(c=>Math.abs(c-d.credit)<0.01)) return false;
+    if(f.sls.length&&!f.sls.some(s=>Math.abs(s-d.sl)<0.01)) return false;
+    if(f.dows.length&&!f.dows.includes(d.dow)) return false;
+    if(f.side!=='both'&&d.optType!==f.side) return false;
+    const idx=TK.indexOf(d.tk);
+    if(idx<0||idx<fi||idx>ti) return false;
+    if(useDR){ if(d.openDate<f.dFrom||d.openDate>f.dTo) return false; }
+    else{ if(d.openDate<cutoff) return false; }
+    return true;
+  });
+}
+
+// ── Stats (single-pass) ──────────────────────────────────────────────────
+function calcStats(trades){
+  if(!trades.length) return null;
+  let wins=0,totalPL=0,winPL=0,lossPL=0,totalPrem=0;
+  const byDate={};
+  for(const t of trades){
+    totalPL+=t.pl; totalPrem+=t.premium;
+    if(t.isWin){wins++;winPL+=t.pl;}else{lossPL+=t.pl;}
+    byDate[t.openDate]=(byDate[t.openDate]||0)+t.pl;
+  }
+  const n=trades.length, losses=n-wins, winRate=wins/n;
+  const avgWin=wins>0?winPL/wins:0, avgLoss=losses>0?lossPL/losses:0;
+  const pf=lossPL!==0?Math.abs(winPL/lossPL):Infinity;
+  const expectancy=winRate*avgWin+(1-winRate)*avgLoss;
+
+  const dates=Object.keys(byDate).sort();
+  let cum=0,peak=0,maxDD=0;
+  const equity=dates.map(d=>{
+    cum+=byDate[d]; if(cum>peak)peak=cum;
+    const dd=peak-cum; if(dd>maxDD)maxDD=dd;
+    return {date:d,eq:+cum.toFixed(2)};
+  });
+
+  // Sharpe
+  let sharpe=0;
+  if(dates.length>1){
+    const vals=dates.map(d=>byDate[d]);
+    const mean=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const std=Math.sqrt(vals.reduce((s,v)=>s+(v-mean)**2,0)/vals.length);
+    sharpe=std===0?0:+(mean/std*Math.sqrt(252)).toFixed(2);
+  }
+  return{n,wins,losses,winRate,totalPL,avgWin,avgLoss,pf,maxDD,equity,expectancy,sharpe,byDate,dates};
+}
+
+// ── Run ──────────────────────────────────────────────────────────────────
+function runBacktest(){
+  if(!allData.length){setStat('Load files first!','err');return;}
+  const btn=document.getElementById('runBtn');
+  btn.disabled=true; btn.textContent='⌛ Running…';
+  setTimeout(()=>{
+    try{ doRun(); }catch(e){ setStat('Error: '+e.message,'err'); console.error(e); }
+    btn.disabled=false; btn.textContent='▶ RUN BACKTEST';
+  },30);
+}
+
+function doRun(){
+  const f=getF();
+  const filtered=applyF(allData,f);
+  if(!filtered.length){ setStat('No trades match filters','err'); showEmpty(); return; }
+  const stats=calcStats(filtered);
+  setStat(filtered.length.toLocaleString()+' trades analyzed','ok');
+  renderAll(filtered,stats,f);
+}
+
+function showEmpty(){
+  document.getElementById('main').innerHTML=
+    '<div class="empty"><div class="ei">🔍</div><p>No trades match current filters.</p></div>';
+}
+
+// ── Chart util ───────────────────────────────────────────────────────────
+function kc(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+const GC='#21262d',TC='#6e7681';
+
+// ── Render all ───────────────────────────────────────────────────────────
+function renderAll(trades,stats,f){
+  document.getElementById('main').innerHTML=`
+    <div class="mrow" id="mrow"></div>
+    <div class="rbox" id="rbox"></div>
+    <div class="g2">
+      <div class="cc"><h3>Equity Curve</h3><div style="position:relative;height:195px"><canvas id="cEq" role="img" aria-label="Equity curve"></canvas></div></div>
+      <div class="cc"><h3>Avg P&amp;L by Entry Time</h3><div style="position:relative;height:195px"><canvas id="cTm" role="img" aria-label="Avg PL by time"></canvas></div></div>
+    </div>
+    <div class="g2">
+      <div class="cc"><h3>Win Rate &amp; Avg P&amp;L by Day</h3><div style="position:relative;height:185px"><canvas id="cDw" role="img" aria-label="Win rate by day"></canvas></div></div>
+      <div class="cc"><h3>P&amp;L Distribution</h3><div style="position:relative;height:185px"><canvas id="cDi" role="img" aria-label="PL distribution"></canvas></div></div>
+    </div>
+    <div class="cc">
+      <h3>Optimizer — All Parameter Combinations <span style="font-weight:400;font-size:9px">(click column header to sort · min 5 trades)</span></h3>
+      <div class="tw" id="optT"></div>
+    </div>
+    <div class="cc"><h3>Win Rate Heatmap — Time × Day</h3><div id="hmap"></div></div>
+    <div class="cc"><h3>Recent Trades (50 most recent in filtered set)</h3><div class="tw" id="recT"></div></div>
+  `;
+  renderMetrics(stats);
+  renderRec(trades,stats);
+  renderEquity(stats);
+  renderByTime(trades);
+  renderByDay(trades);
+  renderDist(trades);
+  buildAndRenderOptimizer(f);
+  renderHeatmap(trades);
+  renderRecent(trades);
+}
+
+function renderMetrics(s){
+  document.getElementById('mrow').innerHTML=[
+    {l:'Win Rate',v:(s.winRate*100).toFixed(1)+'%',s2:s.wins+'W / '+s.losses+'L',c:s.winRate>=.5?'pos':'neg'},
+    {l:'Net P&L',v:(s.totalPL>=0?'+':'')+s.totalPL.toFixed(0),s2:s.n+' trades',c:s.totalPL>=0?'pos':'neg'},
+    {l:'Max Drawdown',v:'-'+s.maxDD.toFixed(0),s2:'from peak',c:'neg'},
+    {l:'Profit Factor',v:isFinite(s.pf)?s.pf.toFixed(2):'∞',s2:'gross win/loss',c:s.pf>=1.5?'pos':s.pf>=1?'warn':'neg'},
+    {l:'Sharpe Ratio',v:s.sharpe.toFixed(2),s2:'annualized',c:s.sharpe>=1?'pos':s.sharpe>=0?'warn':'neg'},
+  ].map(r=>`<div class="mc"><div class="ml">${r.l}</div><div class="mv ${r.c}">${r.v}</div><div class="ms">${r.s2}</div></div>`).join('');
+}
+
+function renderRec(trades,stats){
+  // aggregate by time key
+  const tg={};
+  for(const t of trades){
+    if(!tg[t.tk]) tg[t.tk]={w:0,n:0,pl:0};
+    tg[t.tk].n++; tg[t.tk].pl+=t.pl; if(t.isWin)tg[t.tk].w++;
+  }
+  let bT='',bTWR=0;
+  for(const [k,g] of Object.entries(tg)){ const wr=g.n>=10?g.w/g.n:0; if(wr>bTWR){bTWR=wr;bT=k;} }
+
+  const dg={};
+  for(const t of trades){
+    if(!dg[t.dow]) dg[t.dow]={w:0,n:0};
+    dg[t.dow].n++; if(t.isWin)dg[t.dow].w++;
+  }
+  let bD=0,bDWR=0;
+  for(const [d,g] of Object.entries(dg)){ const wr=g.w/g.n; if(wr>bDWR){bDWR=wr;bD=+d;} }
+
+  let pPL=0,pN=0,cPL=0,cN=0;
+  for(const t of trades){
+    if(t.optType==='P'){pPL+=t.pl;pN++;}
+    else if(t.optType==='C'){cPL+=t.pl;cN++;}
+  }
+  const pAvg=pN>0?pPL/pN:0, cAvg=cN>0?cPL/cN:0;
+  const bLeg=pAvg>=cAvg?'Put spreads':'Call spreads', bLegAvg=Math.max(pAvg,cAvg);
+
+  document.getElementById('rbox').innerHTML=`<h3>🤖 Optimizer Recommendation</h3>
+    <p>Analyzed <span class="rt">${stats.n.toLocaleString()} trades</span>.
+    Best entry: <span class="rt">${tkLabel(bT)||'—'}</span> win rate <span class="rt">${(bTWR*100).toFixed(1)}%</span>.
+    Best day: <span class="rt">${DN[bD]||'—'}</span> (${(bDWR*100).toFixed(1)}% wins).
+    Stronger leg: <span class="rt">${bLeg}</span> avg <span class="rt">$${bLegAvg.toFixed(2)}</span>.
+    Expectancy <span class="rt">$${stats.expectancy.toFixed(2)}/trade</span> ·
+    Max DD <span class="rt bad">-$${stats.maxDD.toFixed(0)}</span>
+    ${stats.pf>=1.5?'· <span class="rt">✓ profitable setup</span>':stats.totalPL<0?'· <span class="rt bad">⚠ net negative</span>':''}
+    </p>`;
+}
+
+function renderEquity(stats){
+  kc('eq');
+  const ctx=document.getElementById('cEq').getContext('2d');
+  const last=stats.equity.length?stats.equity[stats.equity.length-1].eq:0;
+  const col=last>=0?'#3fb950':'#f85149';
+  charts['eq']=new Chart(ctx,{type:'line',
+    data:{labels:stats.equity.map(e=>e.date.slice(5)),
+          datasets:[{data:stats.equity.map(e=>e.eq),borderColor:col,
+            backgroundColor:last>=0?'rgba(63,185,80,.07)':'rgba(248,81,73,.07)',
+            fill:true,borderWidth:1.5,pointRadius:0,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:TC,maxTicksLimit:8,font:{size:9}},grid:{color:GC}},
+              y:{ticks:{color:TC,font:{size:10},callback:v=>'$'+v.toFixed(0)},grid:{color:GC}}}}});
+}
+
+function renderByTime(trades){
+  kc('tm');
+  const ctx=document.getElementById('cTm').getContext('2d');
+  const agg={};
+  for(const tk of TK) agg[tk]={pl:0,n:0};
+  for(const t of trades){ if(agg[t.tk]){agg[t.tk].pl+=t.pl;agg[t.tk].n++;} }
+  const vals=TK.map(k=>agg[k].n>0?+(agg[k].pl/agg[k].n).toFixed(2):0);
+  charts['tm']=new Chart(ctx,{type:'bar',
+    data:{labels:TL,datasets:[{data:vals,
+      backgroundColor:vals.map(v=>v>=0?'rgba(63,185,80,.8)':'rgba(248,81,73,.8)'),
+      borderWidth:0,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:TC,maxRotation:55,font:{size:8},autoSkip:false},grid:{color:GC}},
+              y:{ticks:{color:TC,font:{size:10},callback:v=>'$'+v.toFixed(1)},grid:{color:GC}}}}});
+}
+
+function renderByDay(trades){
+  kc('dw');
+  const ctx=document.getElementById('cDw').getContext('2d');
+  const dows=[1,2,3,4,5];
+  const wrs=[],pls=[];
+  for(const d of dows){
+    let w=0,n=0,pl=0;
+    for(const t of trades){ if(t.dow===d){n++;pl+=t.pl;if(t.isWin)w++;} }
+    wrs.push(n>0?+(w/n*100).toFixed(1):0);
+    pls.push(n>0?+(pl/n).toFixed(2):0);
+  }
+  charts['dw']=new Chart(ctx,{type:'bar',
+    data:{labels:['Mon','Tue','Wed','Thu','Fri'],datasets:[
+      {label:'Win%',data:wrs,backgroundColor:'#1f6feb',borderWidth:0,borderRadius:3,yAxisID:'y'},
+      {label:'Avg$',data:pls,type:'line',borderColor:'#3fb950',borderWidth:2,pointRadius:4,tension:.3,yAxisID:'y2',fill:false}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:TC,font:{size:11}},grid:{color:GC}},
+              y:{ticks:{color:TC,font:{size:10},callback:v=>v+'%'},grid:{color:GC},min:0,max:100},
+              y2:{position:'right',ticks:{color:'#3fb950',font:{size:10},callback:v=>'$'+v},grid:{display:false}}}}});
+}
+
+function renderDist(trades){
+  kc('di');
+  const ctx=document.getElementById('cDi').getContext('2d');
+  const pls=trades.map(t=>t.pl);
+  const mn=Math.min(...pls),mx=Math.max(...pls);
+  const bins=20,step=(mx-mn)/bins||1;
+  const bkts=Array.from({length:bins},(_,i)=>({lv:mn+i*step,count:0}));
+  for(const v of pls){ const idx=Math.min(Math.floor((v-mn)/step),bins-1); bkts[idx].count++; }
+  charts['di']=new Chart(ctx,{type:'bar',
+    data:{labels:bkts.map(b=>b.lv.toFixed(1)),datasets:[{data:bkts.map(b=>b.count),
+      backgroundColor:bkts.map(b=>b.lv>=0?'rgba(63,185,80,.8)':'rgba(248,81,73,.8)'),
+      borderWidth:0,borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{x:{ticks:{color:TC,font:{size:9},maxTicksLimit:8},grid:{color:GC}},
+              y:{ticks:{color:TC,font:{size:10}},grid:{color:GC}}}}});
+}
+
+// ── Optimizer ────────────────────────────────────────────────────────────
+// Build combos WITHOUT calling filterData per combo (too slow / stack risk).
+// Instead: group allData by (wing,credit,sl,optType) up front, then apply
+// only date/lookback filter (which is the same across all combos).
+function buildAndRenderOptimizer(f){
+  // date cutoff shared across all combos
+  const useDR=f.dFrom&&f.dTo;
+  const cutoff=useDR?null:new Date(Date.now()-f.lookback*86400000).toISOString().slice(0,10);
+
+  // Pre-filter by date/lookback only
+  const dateFiltered=allData.filter(d=>{
+    if(useDR) return d.openDate>=f.dFrom&&d.openDate<=f.dTo;
+    return d.openDate>=cutoff;
+  });
+
+  // Group by key
+  const groups={};
+  for(const t of dateFiltered){
+    const key=t.wing+'|'+t.credit+'|'+t.sl+'|'+t.optType;
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(t);
+  }
+
+  // Also build IC (P+C paired by date+time) — just combine P and C for same params
+  const icGroups={};
+  for(const t of dateFiltered){
+    const key=t.wing+'|'+t.credit+'|'+t.sl;
+    if(!icGroups[key]) icGroups[key]=[];
+    icGroups[key].push(t);
+  }
+
+  lastCombos=[];
+
+  // Single-leg combos
+  for(const [key,trades] of Object.entries(groups)){
+    if(trades.length<5) continue;
+    const [wing,credit,sl,opt]=key.split('|');
+    const s=calcStats(trades);
+    if(!s) continue;
+    lastCombos.push({
+      wing:+wing,credit:+credit,sl:+sl,
+      side:opt==='P'?'Put':'Call',
+      n:s.n,winRate:s.winRate,netPL:s.totalPL,
+      avgPL:s.totalPL/s.n,
+      pf:isFinite(s.pf)?s.pf:99,
+      maxDD:s.maxDD,sharpe:s.sharpe
+    });
+  }
+
+  // IC combos
+  for(const [key,trades] of Object.entries(icGroups)){
+    if(trades.length<5) continue;
+    const [wing,credit,sl]=key.split('|');
+    const s=calcStats(trades);
+    if(!s) continue;
+    lastCombos.push({
+      wing:+wing,credit:+credit,sl:+sl,
+      side:'IC',
+      n:s.n,winRate:s.winRate,netPL:s.totalPL,
+      avgPL:s.totalPL/s.n,
+      pf:isFinite(s.pf)?s.pf:99,
+      maxDD:s.maxDD,sharpe:s.sharpe
+    });
+  }
+
+  renderOptTable();
+}
+
+const OCOLS=[
+  {k:'wing',  l:'Wing',    f:v=>v+'pt'},
+  {k:'credit',l:'Credit',  f:v=>'$'+v.toFixed(1)},
+  {k:'sl',    l:'Stop',    f:v=>v+'x'},
+  {k:'side',  l:'Side',    f:v=>v},
+  {k:'n',     l:'Trades',  f:v=>v},
+  {k:'winRate',l:'Win%',   f:v=>(v*100).toFixed(1)+'%'},
+  {k:'netPL', l:'Net P&L', f:v=>(v>=0?'+':'')+v.toFixed(0)},
+  {k:'avgPL', l:'Avg/Trade',f:v=>(v>=0?'+':'')+v.toFixed(2)},
+  {k:'pf',    l:'Prof.F',  f:v=>v>=99?'∞':v.toFixed(2)},
+  {k:'maxDD', l:'MaxDD',   f:v=>'-'+v.toFixed(0)},
+  {k:'sharpe',l:'Sharpe',  f:v=>v.toFixed(2)},
+];
+
+function renderOptTable(){
+  // sort
+  lastCombos.sort((a,b)=>sortDir*(b[sortCol]-a[sortCol]));
+  const top=lastCombos.slice(0,80);
+
+  let html='<table><thead><tr>';
+  for(const c of OCOLS){
+    const arr=c.k===sortCol?(sortDir>0?'↑':'↓'):'';
+    html+=`<th class="s" data-col="${c.k}">${c.l} <small>${arr}</small></th>`;
+  }
+  html+='</tr></thead><tbody>';
+  for(let i=0;i<top.length;i++){
+    const row=top[i];
+    html+='<tr>';
+    for(const c of OCOLS){
+      const v=row[c.k]; const txt=c.f(v);
+      let cls='';
+      if(c.k==='netPL'||c.k==='avgPL') cls=v>=0?'pos':'neg';
+      if(c.k==='winRate') cls=v>=.6?'pos':v<.45?'neg':'';
+      if(c.k==='maxDD') cls='neg';
+      if(c.k==='sharpe') cls=v>=1?'pos':v<0?'neg':'';
+      const star=i===0&&c.k==='netPL'?' <span class="bw b">best</span>':'';
+      html+=`<td class="${cls}">${txt}${star}</td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody></table>';
+  html+=`<p style="font-size:10px;color:var(--text3);margin-top:5px">Showing ${top.length} of ${lastCombos.length} combinations (min 5 trades). Click header to sort.</p>`;
+  document.getElementById('optT').innerHTML=html;
+
+  // sort listeners via event delegation — no inline onclick
+  document.getElementById('optT').querySelector('table').addEventListener('click',e=>{
+    const th=e.target.closest('th[data-col]');
+    if(!th) return;
+    const col=th.dataset.col;
+    if(col===sortCol) sortDir*=-1; else{sortCol=col;sortDir=-1;}
+    renderOptTable();
+  });
+}
+
+// ── Heatmap ──────────────────────────────────────────────────────────────
+function renderHeatmap(trades){
+  // grid[dow][tk] = {w,n}
+  const grid={};
+  for(const d of [1,2,3,4,5]){ grid[d]={}; for(const tk of TK) grid[d][tk]={w:0,n:0}; }
+  for(const t of trades){
+    if(grid[t.dow]&&grid[t.dow][t.tk]){
+      grid[t.dow][t.tk].n++;
+      if(t.isWin) grid[t.dow][t.tk].w++;
+    }
+  }
+  let h='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:10px">';
+  h+='<thead><tr><th style="padding:4px 8px;text-align:left;background:var(--bg3);color:var(--text3);font-size:9px">Time</th>';
+  for(const d of ['Mon','Tue','Wed','Thu','Fri'])
+    h+=`<th style="padding:4px 8px;text-align:center;background:var(--bg3);color:var(--text3);font-size:9px">${d}</th>`;
+  h+='</tr></thead><tbody>';
+  for(let ti=0;ti<TK.length;ti++){
+    const tk=TK[ti];
+    h+=`<tr><td style="padding:2px 8px;color:var(--text3);font-family:var(--font);font-size:9px">${TL[ti]}</td>`;
+    for(const d of [1,2,3,4,5]){
+      const c=grid[d][tk];
+      let bg='var(--bg3)',fc='var(--text3)',val='—';
+      if(c.n>=3){
+        const wr=c.w/c.n;
+        if(wr>=.75){bg='#0d4429';fc='#56d364';}
+        else if(wr>=.65){bg='#196c2e';fc='#3fb950';}
+        else if(wr>=.55){bg='#1a2e1a';fc='#2ea043';}
+        else if(wr>=.45){bg='#2d1b1b';fc='#f85149';}
+        else{bg='#3d0c0c';fc='#ff7b72';}
+        val=(wr*100).toFixed(0)+'%';
+      } else if(c.n>0) val='—';
+      h+=`<td style="text-align:center;padding:2px 3px;background:${bg};border:1px solid var(--bg)">
+            <span style="color:${fc};font-size:9px;display:block">${val}</span>
+            ${c.n>=3?`<span style="color:var(--text3);font-size:7px">${c.n}t</span>`:''}
+          </td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</tbody></table></div>';
+  h+='<p style="font-size:10px;color:var(--text3);margin-top:5px">Cells need ≥3 trades to be colored. Green = high win rate, red = low.</p>';
+  document.getElementById('hmap').innerHTML=h;
+}
+
+// ── Recent trades ────────────────────────────────────────────────────────
+function renderRecent(trades){
+  const recent=[...trades].sort((a,b)=>b.openDate.localeCompare(a.openDate)).slice(0,50);
+  let h='<table><thead><tr><th>Date</th><th>Time</th><th>Type</th><th>Day</th><th>Wing</th><th>Credit</th><th>SL</th><th>Premium</th><th>P&L</th><th>Outcome</th></tr></thead><tbody>';
+  for(const t of recent){
+    h+=`<tr>
+      <td>${t.openDate}</td>
+      <td style="font-family:var(--font)">${tkLabel(t.tk)}</td>
+      <td style="color:${t.optType==='P'?'#d29922':'#58a6ff'}">${t.optType}</td>
+      <td>${DN[t.dow]||t.dow}</td>
+      <td>${t.wing}</td>
+      <td>$${t.credit.toFixed(1)}</td>
+      <td>${t.sl}x</td>
+      <td>$${t.premium.toFixed(2)}</td>
+      <td class="${t.pl>=0?'pos':'neg'}">${t.pl>=0?'+':''}$${t.pl.toFixed(2)}</td>
+      <td><span class="bw ${t.isWin?'w':'l'}">${t.isWin?'WIN':'LOSS'}</span></td>
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  document.getElementById('recT').innerHTML=h;
+}
+
+// ── Drop zone wiring ─────────────────────────────────────────────────────
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');addFiles([...e.dataTransfer.files]);});
+document.getElementById('fi').addEventListener('change',e=>addFiles([...e.target.files]));
+</script>
+</body>
+</html>

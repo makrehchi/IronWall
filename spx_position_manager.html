@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX Options Position Manager</title>
+<style>
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161e;
+    --bg3: #1a1e28;
+    --bg4: #222736;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --text2: #8891a8;
+    --text3: #555e72;
+    --green: #2ecc80;
+    --green-bg: rgba(46,204,128,0.12);
+    --green-border: rgba(46,204,128,0.3);
+    --red: #f05050;
+    --red-bg: rgba(240,80,80,0.12);
+    --red-border: rgba(240,80,80,0.3);
+    --blue: #5b8fff;
+    --blue-bg: rgba(91,143,255,0.12);
+    --blue-border: rgba(91,143,255,0.3);
+    --amber: #f0a830;
+    --amber-bg: rgba(240,168,48,0.12);
+    --amber-border: rgba(240,168,48,0.3);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --mono: 'JetBrains Mono', 'Fira Mono', 'Consolas', monospace;
+    --sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* ── Layout ── */
+  .wrapper { max-width: 1200px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* ── Top bar ── */
+  .topbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 28px; flex-wrap: wrap; }
+  .spx-block { display: flex; flex-direction: column; gap: 4px; }
+  .spx-ticker { font-size: 11px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; }
+  .spx-price-row { display: flex; align-items: baseline; gap: 10px; }
+  .spx-price { font-size: 42px; font-weight: 700; font-family: var(--mono); letter-spacing: -1px; color: var(--text); }
+  .spx-chg { font-size: 15px; font-weight: 500; font-family: var(--mono); }
+  .up  { color: var(--green); }
+  .dn  { color: var(--red); }
+  .spx-meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+  .top-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding-top: 6px; }
+  .btn-refresh { display: flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 12px; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s; }
+  .btn-refresh:hover { background: var(--bg4); color: var(--text); }
+  .btn-refresh svg { width: 13px; height: 13px; }
+  .iv-row { display: flex; align-items: center; gap: 8px; }
+  .iv-row label { font-size: 11px; color: var(--text3); }
+  .iv-input { width: 70px; padding: 5px 8px; font-size: 12px; font-family: var(--mono); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); text-align: center; }
+  .iv-input:focus { outline: none; border-color: var(--blue); }
+  .iv-suffix { font-size: 11px; color: var(--text3); }
+
+  /* ── Summary cards ── */
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .sum-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; }
+  .sum-label { font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; }
+  .sum-val { font-size: 22px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+  .sum-val.profit { color: var(--green); }
+  .sum-val.loss   { color: var(--red); }
+
+  /* ── Add panel ── */
+  .add-panel { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; margin-bottom: 24px; }
+  .panel-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 14px; }
+  .strat-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .stab { padding: 6px 16px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); border-radius: 20px; background: transparent; color: var(--text3); transition: all 0.15s; }
+  .stab:hover { color: var(--text2); border-color: var(--border2); }
+  .stab.act-bp { background: var(--green-bg); color: var(--green); border-color: var(--green-border); }
+  .stab.act-bc { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border); }
+  .stab.act-ic { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-border); }
+  .form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+  .fgroup { display: flex; flex-direction: column; gap: 5px; }
+  .fgroup label { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text3); }
+  .fgroup input { padding: 7px 10px; font-size: 13px; font-family: var(--mono); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); width: 120px; }
+  .fgroup input:focus { outline: none; border-color: var(--blue); }
+  .fgroup.wide input { width: 90px; }
+  .fgroup.narrow input { width: 80px; }
+  .add-btn { padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; border-radius: var(--radius-sm); letter-spacing: 0.02em; transition: all 0.15s; white-space: nowrap; }
+  .add-btn:hover { filter: brightness(1.15); }
+  .add-btn-bp { background: var(--green); color: #04221a; }
+  .add-btn-bc { background: var(--red);   color: #220404; }
+  .add-btn-ic { background: var(--blue);  color: #040d22; }
+
+  /* ── Positions ── */
+  .pos-section-title { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  .positions-wrap { display: flex; flex-direction: column; gap: 14px; }
+  .empty { text-align: center; padding: 40px 20px; color: var(--text3); font-size: 13px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); }
+
+  /* ── Position card ── */
+  .pos-card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .pos-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px; }
+  .pos-head-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .badge { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 10px; border-radius: 20px; }
+  .badge-bp { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+  .badge-bc { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red-border); }
+  .badge-ic { background: var(--blue-bg);  color: var(--blue);  border: 1px solid var(--blue-border); }
+  .pos-info { font-size: 12px; color: var(--text3); display: flex; gap: 12px; flex-wrap: wrap; }
+  .pos-info span { display: flex; align-items: center; gap: 4px; }
+  .pos-head-right { display: flex; align-items: center; gap: 12px; }
+  .pos-pnl-total { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+
+  /* ── Stats bar (max profit / loss / dte) ── */
+  .pos-stats { display: flex; gap: 0; border-bottom: 1px solid var(--border); background: var(--bg3); }
+  .stat-pill { padding: 8px 16px; font-size: 11px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 2px; }
+  .stat-pill:last-child { border-right: none; }
+  .stat-pill .slbl { color: var(--text3); letter-spacing: 0.05em; text-transform: uppercase; font-size: 10px; }
+  .stat-pill .sval { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+
+  /* ── P&L bar ── */
+  .pnl-bar-wrap { padding: 8px 16px; border-bottom: 1px solid var(--border); background: var(--bg3); }
+  .pnl-bar-track { height: 5px; background: var(--bg4); border-radius: 3px; overflow: hidden; position: relative; }
+  .pnl-bar-fill { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+  .pnl-bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: var(--text3); margin-top: 4px; font-family: var(--mono); }
+
+  /* ── Legs table ── */
+  .legs-tbl { width: 100%; border-collapse: collapse; }
+  .legs-tbl th { padding: 7px 14px; text-align: left; font-size: 10px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--text3); background: var(--bg3); font-weight: 500; }
+  .legs-tbl td { padding: 9px 14px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 12px; vertical-align: middle; }
+  .legs-tbl tr.closed td { opacity: 0.45; }
+  .leg-side { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 12px; font-family: var(--sans); }
+  .leg-short { background: var(--red-bg);   color: var(--red);   }
+  .leg-long  { background: var(--green-bg); color: var(--green); }
+  .leg-name  { font-family: var(--sans); color: var(--text2); font-size: 12px; }
+  .bs-est    { font-size: 10px; color: var(--text3); }
+  .close-cell { display: flex; align-items: center; gap: 6px; }
+  .close-inp { width: 76px; padding: 5px 8px; font-size: 12px; font-family: var(--mono); background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); }
+  .close-inp:focus { outline: none; border-color: var(--blue); }
+  .btn-close-leg { padding: 5px 12px; font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid var(--border2); border-radius: var(--radius-sm); background: transparent; color: var(--text2); transition: all 0.15s; }
+  .btn-close-leg:hover { background: var(--bg4); color: var(--text); }
+  .closed-lbl { font-size: 11px; color: var(--text3); font-family: var(--sans); display: flex; align-items: center; gap: 4px; }
+  .closed-lbl svg { color: var(--green); }
+
+  .leg-pnl { font-weight: 600; }
+  .pos-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; background: var(--bg3); }
+  .btn-del { padding: 5px 12px; font-size: 11px; cursor: pointer; border: 1px solid var(--red-border); border-radius: var(--radius-sm); background: transparent; color: var(--red); opacity: 0.6; transition: all 0.15s; }
+  .btn-del:hover { opacity: 1; background: var(--red-bg); }
+
+  /* ── DTE badge ── */
+  .dte-badge { font-size: 11px; font-family: var(--mono); padding: 2px 8px; border-radius: 10px; }
+  .dte-ok   { background: var(--green-bg); color: var(--green); }
+  .dte-warn { background: var(--amber-bg); color: var(--amber); }
+  .dte-exp  { background: var(--red-bg);   color: var(--red);   }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .spx-price { font-size: 30px; }
+    .fgroup input { width: 100px; }
+    .form-row { gap: 8px; }
+    .pos-stats { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- Top bar -->
+  <div class="topbar">
+    <div class="spx-block">
+      <div class="spx-ticker">SPX · S&P 500 Index</div>
+      <div class="spx-price-row">
+        <span class="spx-price" id="spx-price">—</span>
+        <span class="spx-chg" id="spx-chg"></span>
+      </div>
+      <div class="spx-meta" id="spx-meta">Fetching live price…</div>
+    </div>
+    <div class="top-actions">
+      <button class="btn-refresh" onclick="fetchSPX()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh price
+      </button>
+      <div class="iv-row">
+        <label>Implied Vol (VIX proxy)</label>
+        <input class="iv-input" id="iv-input" type="number" value="16" min="1" max="150" step="0.5" oninput="refreshAll()">
+        <span class="iv-suffix">%</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="sum-card"><div class="sum-label">Total credit</div><div class="sum-val" id="tot-credit">$0</div></div>
+    <div class="sum-card"><div class="sum-label">Realized P&L</div><div class="sum-val" id="tot-realized">$0</div></div>
+    <div class="sum-card"><div class="sum-label">Unrealized P&L</div><div class="sum-val" id="tot-unrealized">$0</div></div>
+    <div class="sum-card"><div class="sum-label">Total P&L</div><div class="sum-val" id="tot-total">$0</div></div>
+    <div class="sum-card"><div class="sum-label">Open positions</div><div class="sum-val" id="tot-open">0</div></div>
+    <div class="sum-card"><div class="sum-label">Max portfolio risk</div><div class="sum-val loss" id="tot-maxrisk">$0</div></div>
+  </div>
+
+  <!-- Add panel -->
+  <div class="add-panel">
+    <div class="panel-title">Add position</div>
+    <div class="strat-tabs">
+      <button class="stab act-bp" id="tab-bp" onclick="setTab('bp')">Bull Put Spread</button>
+      <button class="stab" id="tab-bc" onclick="setTab('bc')">Bear Call Spread</button>
+      <button class="stab" id="tab-ic" onclick="setTab('ic')">Iron Condor</button>
+    </div>
+    <div class="form-row" id="form-area"></div>
+  </div>
+
+  <!-- Positions -->
+  <div class="pos-section-title">Positions</div>
+  <div class="positions-wrap" id="positions-wrap">
+    <div class="empty">No positions yet — add one above to start tracking.</div>
+  </div>
+
+</div>
+
+<script>
+/* ────────────────────────────────────────────
+   STATE
+──────────────────────────────────────────── */
+let spxPrice = null;
+let spxPrev  = null;
+let activeTab = 'bp';
+let positions  = [];
+let idSeq = 1;
+
+/* ────────────────────────────────────────────
+   LIVE PRICE
+──────────────────────────────────────────── */
+async function fetchSPX() {
+  document.getElementById('spx-meta').textContent = 'Updating…';
+  try {
+    const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?interval=1m&range=1d');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const js  = await res.json();
+    const q   = js.chart.result[0];
+    const cur = q.meta.regularMarketPrice;
+    const prev= q.meta.chartPreviousClose || q.meta.previousClose || cur;
+    spxPrice  = cur;
+    spxPrev   = prev;
+    const chg = cur - prev;
+    const pct = (chg / prev * 100);
+    document.getElementById('spx-price').textContent = cur.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    const cel = document.getElementById('spx-chg');
+    cel.textContent = (chg >= 0 ? '+' : '') + chg.toFixed(2) + ' (' + (pct>=0?'+':'') + pct.toFixed(2) + '%)';
+    cel.className = 'spx-chg ' + (chg >= 0 ? 'up' : 'dn');
+    document.getElementById('spx-meta').textContent = 'Live · refreshed ' + new Date().toLocaleTimeString() + ' · auto-refresh every 60s';
+    refreshAll();
+  } catch(e) {
+    document.getElementById('spx-meta').textContent = 'Live feed unavailable — enter SPX manually in the form if needed';
+    document.getElementById('spx-price').textContent = '—';
+  }
+}
+
+/* ────────────────────────────────────────────
+   BLACK-SCHOLES ENGINE
+──────────────────────────────────────────── */
+function normCDF(x) {
+  const a1=0.254829592, a2=-0.284496736, a3=1.421413741,
+        a4=-1.453152027, a5=1.061405429, p=0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+  const t = 1.0 / (1.0 + p * x);
+  const y = 1.0 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return 0.5 * (1.0 + sign * y);
+}
+
+function bsPrice(S, K, T, r, sigma, isCall) {
+  if (T <= 0) {
+    const intrinsic = isCall ? Math.max(S - K, 0) : Math.max(K - S, 0);
+    return intrinsic;
+  }
+  const d1 = (Math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * Math.sqrt(T));
+  const d2 = d1 - sigma * Math.sqrt(T);
+  if (isCall) {
+    return S * normCDF(d1) - K * Math.exp(-r * T) * normCDF(d2);
+  } else {
+    return K * Math.exp(-r * T) * normCDF(-d2) - S * normCDF(-d1);
+  }
+}
+
+function bsLegEstimate(leg, spot, iv, dte) {
+  const sigma = iv / 100;
+  const T = Math.max(dte / 365, 0.0001);
+  const r = 0.053;
+  const isCall = leg.role.toLowerCase().includes('call');
+  return Math.max(0.01, bsPrice(spot, leg.strike, T, r, sigma, isCall));
+}
+
+/* ────────────────────────────────────────────
+   FORM
+──────────────────────────────────────────── */
+function setTab(t) {
+  activeTab = t;
+  ['bp','bc','ic'].forEach(x => {
+    document.getElementById('tab-'+x).className = 'stab' + (x===t ? ' act-'+x : '');
+  });
+  renderForm();
+}
+
+function fld(id, label, placeholder, val, w) {
+  const width = w || '120px';
+  return `<div class="fgroup"><label>${label}</label><input type="number" id="f-${id}" placeholder="${placeholder}" value="${val||''}" step="any" style="width:${width}"></div>`;
+}
+function fldDate(id, label) {
+  const today = new Date();
+  const defDate = new Date(today);
+  defDate.setDate(today.getDate() + 1);
+  const dd = defDate.toISOString().split('T')[0];
+  return `<div class="fgroup"><label>${label}</label><input type="date" id="f-${id}" value="${dd}" style="width:130px;padding:7px 10px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-family:var(--sans)"></div>`;
+}
+
+function getF(id) { return parseFloat(document.getElementById('f-'+id).value) || 0; }
+function getS(id) { return document.getElementById('f-'+id).value || ''; }
+
+function renderForm() {
+  const t = activeTab;
+  let html = '';
+  if (t === 'bp') {
+    html = fld('short-strike','Short Put strike','e.g. 5500') +
+           fld('long-strike','Long Put strike','e.g. 5450') +
+           fld('credit','Credit received','e.g. 2.50') +
+           fld('qty','Contracts','1','1','70px') +
+           fldDate('expiry','Expiry date') +
+           `<div class="fgroup" style="justify-content:flex-end;margin-top:auto"><button class="add-btn add-btn-bp" onclick="addPosition()">+ Add Bull Put</button></div>`;
+  } else if (t === 'bc') {
+    html = fld('short-strike','Short Call strike','e.g. 5700') +
+           fld('long-strike','Long Call strike','e.g. 5750') +
+           fld('credit','Credit received','e.g. 2.00') +
+           fld('qty','Contracts','1','1','70px') +
+           fldDate('expiry','Expiry date') +
+           `<div class="fgroup" style="justify-content:flex-end;margin-top:auto"><button class="add-btn add-btn-bc" onclick="addPosition()">+ Add Bear Call</button></div>`;
+  } else {
+    html = fld('put-short','Short Put','e.g. 5450','','100px') +
+           fld('put-long','Long Put','e.g. 5400','','100px') +
+           fld('call-short','Short Call','e.g. 5650','','100px') +
+           fld('call-long','Long Call','e.g. 5700','','100px') +
+           fld('put-credit','Put credit','e.g. 2.25','','100px') +
+           fld('call-credit','Call credit','e.g. 2.00','','100px') +
+           fld('qty','Contracts','1','1','70px') +
+           fldDate('expiry','Expiry date') +
+           `<div class="fgroup" style="justify-content:flex-end;margin-top:auto"><button class="add-btn add-btn-ic" onclick="addPosition()">+ Add Iron Condor</button></div>`;
+  }
+  document.getElementById('form-area').innerHTML = html;
+}
+
+/* ────────────────────────────────────────────
+   ADD POSITION
+──────────────────────────────────────────── */
+function addPosition() {
+  const t = activeTab;
+  const qty     = Math.max(1, Math.round(getF('qty'))) || 1;
+  const expiry  = getS('expiry');
+  let pos;
+
+  if (t === 'bp') {
+    const ss = getF('short-strike'), ls = getF('long-strike'), cr = getF('credit');
+    if (!ss || !ls || !cr) { alert('Please fill Short Put strike, Long Put strike, and Credit.'); return; }
+    if (ls >= ss) { alert('Long Put strike must be below Short Put strike.'); return; }
+    const width = ss - ls;
+    const maxProfit = cr * qty * 100;
+    const maxLoss   = (width - cr) * qty * 100;
+    pos = { id:idSeq++, type:'bp', qty, expiry, maxProfit, maxLoss, createdAt: new Date(),
+      legs: [
+        { id:0, role:'Short Put', strike:ss, side:'short', openPx:cr,   closePx:null },
+        { id:1, role:'Long Put',  strike:ls, side:'long',  openPx:null, closePx:null }
+      ]
+    };
+  } else if (t === 'bc') {
+    const ss = getF('short-strike'), ls = getF('long-strike'), cr = getF('credit');
+    if (!ss || !ls || !cr) { alert('Please fill Short Call strike, Long Call strike, and Credit.'); return; }
+    if (ls <= ss) { alert('Long Call strike must be above Short Call strike.'); return; }
+    const width = ls - ss;
+    const maxProfit = cr * qty * 100;
+    const maxLoss   = (width - cr) * qty * 100;
+    pos = { id:idSeq++, type:'bc', qty, expiry, maxProfit, maxLoss, createdAt: new Date(),
+      legs: [
+        { id:0, role:'Short Call', strike:ss, side:'short', openPx:cr,   closePx:null },
+        { id:1, role:'Long Call',  strike:ls, side:'long',  openPx:null, closePx:null }
+      ]
+    };
+  } else {
+    const ps = getF('put-short'), pl = getF('put-long'),
+          cs = getF('call-short'), cl = getF('call-long'),
+          pc = getF('put-credit'), cc = getF('call-credit');
+    if (!ps || !pl || !cs || !cl || (!pc && !cc)) { alert('Fill all four strikes and at least one credit.'); return; }
+    if (pl >= ps) { alert('Long Put must be below Short Put.'); return; }
+    if (cl <= cs) { alert('Long Call must be above Short Call.'); return; }
+    const totalCr = pc + cc;
+    const putWidth  = ps - pl;
+    const callWidth = cl - cs;
+    const maxLoss = Math.max((putWidth - totalCr), (callWidth - totalCr)) * qty * 100;
+    const maxProfit = totalCr * qty * 100;
+    pos = { id:idSeq++, type:'ic', qty, expiry, maxProfit, maxLoss, createdAt: new Date(),
+      legs: [
+        { id:0, role:'Short Put',  strike:ps, side:'short', openPx:pc,   closePx:null },
+        { id:1, role:'Long Put',   strike:pl, side:'long',  openPx:null, closePx:null },
+        { id:2, role:'Short Call', strike:cs, side:'short', openPx:cc,   closePx:null },
+        { id:3, role:'Long Call',  strike:cl, side:'long',  openPx:null, closePx:null }
+      ]
+    };
+  }
+  positions.push(pos);
+  refreshAll();
+}
+
+/* ────────────────────────────────────────────
+   CLOSE LEG
+──────────────────────────────────────────── */
+function closeLeg(posId, legId) {
+  const el = document.getElementById('ci-'+posId+'-'+legId);
+  const px = parseFloat(el.value);
+  if (isNaN(px) || px < 0) { alert('Enter a valid close price (≥ 0).'); return; }
+  const pos = positions.find(p => p.id === posId);
+  if (pos) { pos.legs[legId].closePx = px; refreshAll(); }
+}
+
+function deletePos(posId) {
+  if (!confirm('Remove this position?')) return;
+  positions = positions.filter(p => p.id !== posId);
+  refreshAll();
+}
+
+/* ────────────────────────────────────────────
+   P&L CALCULATIONS
+──────────────────────────────────────────── */
+function getDTE(expiry) {
+  if (!expiry) return null;
+  const exp  = new Date(expiry + 'T23:59:59');
+  const now  = new Date();
+  const diff = (exp - now) / (1000*60*60*24);
+  return Math.max(0, diff);
+}
+
+function getIV() { return parseFloat(document.getElementById('iv-input').value) || 16; }
+
+function calcLegPnl(leg, qty) {
+  if (leg.closePx === null) return null;
+  const sign = leg.side === 'short' ? 1 : -1;
+  const open = leg.openPx !== null ? leg.openPx : 0;
+  return sign * (open - leg.closePx) * qty * 100;
+}
+
+function calcPosPnl(pos) {
+  const iv  = getIV();
+  const dte = pos.expiry ? getDTE(pos.expiry) : 7;
+  let realized = 0, unrealized = 0, hasOpen = false;
+
+  for (const leg of pos.legs) {
+    const pnl = calcLegPnl(leg, pos.qty);
+    if (pnl !== null) {
+      realized += pnl;
+    } else {
+      hasOpen = true;
+      if (spxPrice) {
+        const bsEst = bsLegEstimate(leg, spxPrice, iv, dte);
+        const open  = leg.openPx !== null ? leg.openPx : bsEst;
+        const sign  = leg.side === 'short' ? 1 : -1;
+        unrealized += sign * (open - bsEst) * pos.qty * 100;
+      }
+    }
+  }
+  return { realized, unrealized, total: realized + unrealized, hasOpen };
+}
+
+function getBSEstimate(leg, pos) {
+  if (!spxPrice) return null;
+  const iv  = getIV();
+  const dte = pos.expiry ? getDTE(pos.expiry) : 7;
+  return bsLegEstimate(leg, spxPrice, iv, dte);
+}
+
+/* ────────────────────────────────────────────
+   RENDER
+──────────────────────────────────────────── */
+function fmt$(v, forceSign) {
+  const sign = forceSign ? (v >= 0 ? '+' : '') : '';
+  return sign + v.toLocaleString('en-US', { style:'currency', currency:'USD', maximumFractionDigits:0 });
+}
+function fmtPx(v) {
+  if (v === null || v === undefined) return '—';
+  return v.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+function pnlColor(v) { return v > 0 ? 'color:var(--green)' : v < 0 ? 'color:var(--red)' : 'color:var(--text3)'; }
+
+function dteBadge(expiry) {
+  if (!expiry) return '<span style="color:var(--text3);font-size:11px;">No expiry</span>';
+  const dte = getDTE(expiry);
+  const cls = dte <= 0 ? 'dte-exp' : dte <= 2 ? 'dte-warn' : 'dte-ok';
+  const label = dte <= 0 ? 'EXPIRED' : Math.round(dte) + ' DTE';
+  return `<span class="dte-badge ${cls}">${label}</span>`;
+}
+
+function pnlBarHTML(total, maxProfit, maxLoss) {
+  const range = maxProfit + maxLoss;
+  if (range <= 0) return '';
+  const clipped = Math.max(-maxLoss, Math.min(maxProfit, total));
+  const pct = ((clipped + maxLoss) / range * 100).toFixed(1);
+  const color = total >= 0 ? 'var(--green)' : 'var(--red)';
+  return `<div class="pnl-bar-wrap">
+    <div class="pnl-bar-track">
+      <div class="pnl-bar-fill" style="width:${pct}%;background:${color};"></div>
+    </div>
+    <div class="pnl-bar-labels">
+      <span>-${fmt$(maxLoss)}</span>
+      <span>0</span>
+      <span>+${fmt$(maxProfit)}</span>
+    </div>
+  </div>`;
+}
+
+function renderPositions() {
+  const el = document.getElementById('positions-wrap');
+  if (!positions.length) {
+    el.innerHTML = '<div class="empty">No positions yet — add one above to start tracking.</div>';
+    return;
+  }
+
+  el.innerHTML = positions.map(pos => {
+    const { realized, unrealized, total, hasOpen } = calcPosPnl(pos);
+    const pnlStyle = pnlColor(total);
+    const bname = { bp:'Bull Put Spread', bc:'Bear Call Spread', ic:'Iron Condor' }[pos.type];
+    const dt = pos.createdAt.toLocaleDateString('en-CA');
+
+    const statsBar = `<div class="pos-stats">
+      <div class="stat-pill"><span class="slbl">Max profit</span><span class="sval" style="color:var(--green)">${fmt$(pos.maxProfit)}</span></div>
+      <div class="stat-pill"><span class="slbl">Max loss</span><span class="sval" style="color:var(--red)">-${fmt$(pos.maxLoss)}</span></div>
+      <div class="stat-pill"><span class="slbl">Realized</span><span class="sval" style="${pnlColor(realized)}">${fmt$(realized,true)}</span></div>
+      <div class="stat-pill"><span class="slbl">Unrealized (BS)</span><span class="sval" style="${pnlColor(unrealized)}">${hasOpen && spxPrice ? fmt$(unrealized,true) : '—'}</span></div>
+      <div class="stat-pill"><span class="slbl">Expiry</span><span class="sval">${pos.expiry || '—'}</span></div>
+      <div class="stat-pill" style="border-right:none"><span class="slbl">DTE</span><span class="sval">${dteBadge(pos.expiry)}</span></div>
+    </div>`;
+
+    const legsRows = pos.legs.map(leg => {
+      const isClosed = leg.closePx !== null;
+      const legPnl   = calcLegPnl(leg, pos.qty);
+      const bsEst    = getBSEstimate(leg, pos);
+
+      const closeCell = isClosed
+        ? `<td><span class="closed-lbl"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>${fmtPx(leg.closePx)}</span></td>`
+        : `<td><div class="close-cell"><input class="close-inp" id="ci-${pos.id}-${leg.id}" type="number" step="0.01" min="0" placeholder="${bsEst ? bsEst.toFixed(2) : '0.00'}"><button class="btn-close-leg" onclick="closeLeg(${pos.id},${leg.id})">Close</button></div></td>`;
+
+      const pnlCell = legPnl !== null
+        ? `<span class="leg-pnl" style="${pnlColor(legPnl)}">${fmt$(legPnl,true)}</span>`
+        : (bsEst && spxPrice ? `<span style="color:var(--text3);font-size:11px;" class="bs-est">est. ${fmtPx(bsEst)}</span>` : '<span style="color:var(--text3)">—</span>');
+
+      return `<tr class="${isClosed?'closed':''}">
+        <td><span class="leg-side leg-${leg.side}">${leg.side.toUpperCase()}</span></td>
+        <td class="leg-name">${leg.role}</td>
+        <td>${leg.strike.toLocaleString()}</td>
+        <td>${leg.openPx !== null ? fmtPx(leg.openPx) : '<span style="color:var(--text3)">—</span>'}</td>
+        ${closeCell}
+        <td>${pnlCell}</td>
+      </tr>`;
+    }).join('');
+
+    return `<div class="pos-card">
+      <div class="pos-head">
+        <div class="pos-head-left">
+          <span class="badge badge-${pos.type}">${bname}</span>
+          <div class="pos-info">
+            <span>${pos.qty} contract${pos.qty>1?'s':''}</span>
+            <span>opened ${dt}</span>
+            <span>max credit: ${fmt$(pos.maxProfit)}</span>
+          </div>
+        </div>
+        <div class="pos-head-right">
+          <span class="pos-pnl-total" style="${pnlStyle}">${fmt$(total,true)}</span>
+        </div>
+      </div>
+      ${statsBar}
+      ${pnlBarHTML(total, pos.maxProfit, pos.maxLoss)}
+      <table class="legs-tbl">
+        <thead><tr><th>Side</th><th>Leg</th><th>Strike</th><th>Open px</th><th>Close px</th><th>P&amp;L / BS est.</th></tr></thead>
+        <tbody>${legsRows}</tbody>
+      </table>
+      <div class="pos-footer">
+        <button class="btn-del" onclick="deletePos(${pos.id})">✕ Remove position</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderSummary() {
+  let totCredit = 0, totReal = 0, totUnreal = 0, totOpen = 0, totMaxRisk = 0;
+  for (const pos of positions) {
+    totCredit  += pos.maxProfit;
+    totMaxRisk += pos.maxLoss;
+    const { realized, unrealized, hasOpen } = calcPosPnl(pos);
+    totReal   += realized;
+    totUnreal += unrealized;
+    if (hasOpen) totOpen++;
+  }
+  const totTotal = totReal + totUnreal;
+
+  const setV = (id, v, cls) => {
+    const el = document.getElementById(id);
+    el.textContent = fmt$(v, id !== 'tot-credit' && id !== 'tot-maxrisk');
+    el.className = 'sum-val' + (cls ? ' '+cls : (v > 0 ? ' profit' : v < 0 ? ' loss' : ''));
+  };
+  setV('tot-credit',   totCredit,  '');
+  setV('tot-realized', totReal);
+  setV('tot-unrealized', totUnreal);
+  setV('tot-total',    totTotal);
+  setV('tot-maxrisk',  -totMaxRisk, 'loss');
+  document.getElementById('tot-open').textContent = totOpen;
+  document.getElementById('tot-open').className   = 'sum-val';
+}
+
+function refreshAll() {
+  renderPositions();
+  renderSummary();
+}
+
+/* ────────────────────────────────────────────
+   INIT
+──────────────────────────────────────────── */
+setTab('bp');
+fetchSPX();
+setInterval(fetchSPX, 60000);
+</script>
+</body>
+</html>
