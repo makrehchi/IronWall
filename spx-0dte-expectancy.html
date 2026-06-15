@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPX 0DTE — Wing Expectancy Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --surface: #141920;
+    --surface2: #1c2430;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8edf3;
+    --muted: #6b7a8d;
+    --accent: #00c896;
+    --accent2: #4fa3e0;
+    --neg: #e05a5a;
+    --neg2: #c0392b;
+    --pos: #27ae60;
+    --pos2: #00c896;
+    --font-mono: 'JetBrains Mono', 'Fira Mono', 'Courier New', monospace;
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 4px;
+    background: rgba(0,200,150,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,200,150,0.25);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+
+  /* ── HERO ── */
+  .hero {
+    margin-bottom: 2.5rem;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .hero-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin-bottom: 0.5rem;
+  }
+
+  .hero-sub {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  /* ── STAT CARDS ── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+
+  .stat {
+    background: var(--surface);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-family: var(--font-mono);
+  }
+
+  .stat-value {
+    font-size: 22px;
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--text);
+  }
+
+  .stat-value.pos { color: var(--accent); }
+  .stat-value.neg { color: var(--neg); }
+
+  .stat-note {
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    width: fit-content;
+    margin-bottom: 1.5rem;
+  }
+
+  .tab {
+    padding: 6px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    transition: background 0.15s, color 0.15s;
+    font-family: var(--font-sans);
+  }
+
+  .tab:hover { color: var(--text); }
+
+  .tab.active {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border2);
+  }
+
+  /* ── PANEL ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .panel-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .panel-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-body {
+    padding: 1.5rem;
+  }
+
+  /* ── HEATMAP ── */
+  .heatmap-grid {
+    display: grid;
+    gap: 12px;
+  }
+
+  @media (min-width: 700px) {
+    .heatmap-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .hm-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hm-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .hm-canvas-wrap {
+    position: relative;
+    height: 300px;
+  }
+
+  /* ── LEGEND ── */
+  .legend-bar-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    margin-bottom: 1.25rem;
+  }
+
+  .legend-bar {
+    display: flex;
+    height: 10px;
+    width: 180px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .legend-bar span { flex: 1; }
+
+  /* ── LINE / BAR ── */
+  .chart-wrap { position: relative; height: 360px; }
+
+  .custom-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 0 1.5rem 1.25rem;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  .custom-legend span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .leg-sq {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── INSIGHT BOX ── */
+  .insights {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-top: 1.5rem;
+  }
+
+  .insight {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+  }
+
+  .insight-icon {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .insight-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .insight-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  .accent-text { color: var(--accent); font-family: var(--font-mono); }
+  .neg-text { color: var(--neg); font-family: var(--font-mono); }
+
+  /* ── SELECTOR ── */
+  .selectors {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    outline: none;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    text-align: center;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    SPX · 0DTE · BACKTEST
+  </div>
+  <span class="badge">Stop Loss = 2×</span>
+</header>
+
+<main>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-eyebrow">Expectancy Analysis</div>
+    <h1 class="hero-title">Wing Size vs Credit · Bull Puts &amp; Bear Calls</h1>
+    <p class="hero-sub">Jan 1, 2025 – May 1, 2026 &nbsp;·&nbsp; Expectancy per dollar of credit (normalized ratio)</p>
+  </div>
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat">
+      <span class="stat-label">Best puts</span>
+      <span class="stat-value pos">+0.25</span>
+      <span class="stat-note">Wing 55 / Credit $3</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Best calls</span>
+      <span class="stat-value pos">+0.26</span>
+      <span class="stat-note">Wing 55 / Credit $3</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Worst puts</span>
+      <span class="stat-value neg">−0.42</span>
+      <span class="stat-note">Wing 10 / Credit $3</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Worst calls</span>
+      <span class="stat-value neg">−0.46</span>
+      <span class="stat-note">Wing 10 / Credit $3</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Break-even wing</span>
+      <span class="stat-value">25–30</span>
+      <span class="stat-note">At $1–$2 credit</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Consistent ≥ 0</span>
+      <span class="stat-value pos">Wing ≥ 30</span>
+      <span class="stat-note">All credit levels</span>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('heatmap', this)">Heatmap</button>
+    <button class="tab" onclick="switchTab('line', this)">Line chart</button>
+    <button class="tab" onclick="switchTab('bar', this)">Bar chart</button>
+  </div>
+
+  <!-- HEATMAP VIEW -->
+  <div id="view-heatmap">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Expectancy matrix — all wing × credit combinations</div>
+        <div class="legend-bar-wrap" style="margin:0">
+          <span>Negative</span>
+          <div class="legend-bar">
+            <span style="background:#7b1a1a"></span>
+            <span style="background:#c0392b"></span>
+            <span style="background:#e74c3c"></span>
+            <span style="background:#f4998a"></span>
+            <span style="background:#2d5a3d"></span>
+            <span style="background:#27ae60"></span>
+            <span style="background:#00c896"></span>
+            <span style="background:#007a5c"></span>
+          </div>
+          <span>Positive</span>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="heatmap-grid">
+          <div class="hm-wrap">
+            <div class="hm-label">Bull puts</div>
+            <div class="hm-canvas-wrap"><canvas id="hmPuts" role="img" aria-label="Bull puts heatmap of expectancy by wing size and credit"></canvas></div>
+          </div>
+          <div class="hm-wrap">
+            <div class="hm-label">Bear calls</div>
+            <div class="hm-canvas-wrap"><canvas id="hmCalls" role="img" aria-label="Bear calls heatmap of expectancy by wing size and credit"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LINE VIEW -->
+  <div id="view-line" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Expectancy vs wing size — by credit level</div>
+        <div class="selectors">
+          <select id="lineSide" onchange="updateLine()">
+            <option value="puts">Bull puts</option>
+            <option value="calls">Bear calls</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="lineChart" role="img" aria-label="Line chart of expectancy vs wing size for each credit level"></canvas></div>
+      </div>
+      <div class="custom-legend" id="lineLegend"></div>
+    </div>
+  </div>
+
+  <!-- BAR VIEW -->
+  <div id="view-bar" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Average expectancy by wing size — puts vs calls</div>
+        <div class="selectors">
+          <select id="barCredit" onchange="updateBar()">
+            <option value="all">All credits averaged</option>
+            <option value="0">Credit $1.00</option>
+            <option value="1">Credit $1.50</option>
+            <option value="2">Credit $2.00</option>
+            <option value="3">Credit $2.50</option>
+            <option value="4">Credit $3.00</option>
+          </select>
+        </div>
+      </div>
+      <div class="panel-body">
+        <div class="chart-wrap"><canvas id="barChart" role="img" aria-label="Bar chart comparing puts vs calls expectancy by wing size"></canvas></div>
+      </div>
+      <div class="custom-legend">
+        <span><span class="leg-sq" style="background:#00c896"></span>Bull puts</span>
+        <span><span class="leg-sq" style="background:#4fa3e0"></span>Bear calls</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Insights -->
+  <div class="insights">
+    <div class="insight">
+      <div class="insight-icon">📐</div>
+      <div class="insight-title">Wing size dominates</div>
+      <div class="insight-body">Expectancy rises consistently as wing widens. Wings <span class="neg-text">≤20</span> are high-risk at any credit ≥$2. Wings <span class="accent-text">≥30</span> are positive across all credit levels.</div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">💵</div>
+      <div class="insight-title">Credit matters at small wings</div>
+      <div class="insight-body">Wing 10 swings from <span class="accent-text">+0.01</span> at $1 credit to <span class="neg-text">−0.42</span> at $3 credit. At wing 35+, raising credit improves expectancy.</div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">↔️</div>
+      <div class="insight-title">Calls slightly weaker than puts</div>
+      <div class="insight-body">At small wings and high credits, calls underperform puts. Both converge near <span class="accent-text">+0.25</span> at wing 50–55 / $3 credit.</div>
+    </div>
+    <div class="insight">
+      <div class="insight-icon">🎯</div>
+      <div class="insight-title">Sweet spot</div>
+      <div class="insight-body">Wing <span class="accent-text">≥30</span> with any credit level, or wing <span class="accent-text">≥25</span> capped at $1–$2 credit. Avoid wing ≤20 at credit ≥$2 with SL=2×.</div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  SPX 0DTE Backtest · Jan 1 2025 – May 1 2026 · Stop Loss = 2× · Expectancy = normalized per-dollar-of-credit ratio
+</footer>
+
+<script>
+const wings   = [10,15,20,25,30,35,40,45,50,55];
+const credits = [1, 1.5, 2, 2.5, 3];
+
+const putsData = [
+  [0.01,-0.07,-0.11,-0.19,-0.42],
+  [0.03,0,-0.03,-0.1,-0.16],
+  [0.07,0.06,-0.03,0.03,-0.02],
+  [0.08,0.08,0.09,0.08,0.07],
+  [0.1,0.1,0.11,0.11,0.11],
+  [0.1,0.11,0.15,0.15,0.15],
+  [0.11,0.14,0.16,0.19,0.2],
+  [0.12,0.15,0.18,0.21,0.21],
+  [0.13,0.16,0.19,0.21,0.23],
+  [0.14,0.16,0.2,0.21,0.25]
+];
+
+const callsData = [
+  [-0.04,-0.13,-0.2,-0.29,-0.46],
+  [-0.02,-0.04,-0.08,-0.12,-0.17],
+  [0,0.02,0,-0.01,-0.07],
+  [0.04,0.06,0.06,0.05,0.01],
+  [0.06,0.08,0.11,0.11,0.1],
+  [0.07,0.12,0.12,0.16,0.16],
+  [0.08,0.12,0.15,0.17,0.2],
+  [0.09,0.13,0.17,0.2,0.24],
+  [0.11,0.15,0.18,0.21,0.25],
+  [0.11,0.16,0.21,0.23,0.26]
+];
+
+function valColor(v) {
+  if (v >= 0.2)  return '#007a5c';
+  if (v >= 0.12) return '#00c896';
+  if (v >= 0.05) return '#27ae60';
+  if (v >= 0)    return '#2d5a3d';
+  if (v >= -0.05) return '#7b1a1a';
+  if (v >= -0.15) return '#c0392b';
+  if (v >= -0.3)  return '#e74c3c';
+  return '#a01010';
+}
+
+function textColor(v) {
+  return Math.abs(v) > 0.04 ? '#fff' : '#aaa';
+}
+
+const hmPlugin = (data) => ({
+  id: 'customHm',
+  afterDraw(chart) {
+    const {ctx, chartArea:{left,top,right,bottom}} = chart;
+    const cw = (right-left)/credits.length;
+    const rh = (bottom-top)/wings.length;
+    data.forEach((row, ri) => {
+      row.forEach((val, ci) => {
+        const x = left + ci*cw, y = top + ri*rh;
+        ctx.fillStyle = valColor(val);
+        ctx.fillRect(x+1, y+1, cw-2, rh-2);
+        ctx.fillStyle = textColor(val);
+        ctx.font = '500 11px JetBrains Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(val.toFixed(2), x+cw/2, y+rh/2);
+      });
+    });
+  }
+});
+
+function makeHeatmap(id, data) {
+  return new Chart(document.getElementById(id), {
+    type: 'scatter',
+    data: { datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: {
+          type: 'linear', min: -0.5, max: credits.length - 0.5,
+          ticks: { callback: v => credits[Math.round(v)] !== undefined ? '$'+credits[Math.round(v)] : '', stepSize:1, color:'#6b7a8d', font:{size:11,family:'JetBrains Mono,monospace'} },
+          title: { display:true, text:'Credit ($)', color:'#6b7a8d', font:{size:11} },
+          grid: { display:false },
+          border: { color:'rgba(255,255,255,0.07)' }
+        },
+        y: {
+          type: 'linear', min: -0.5, max: wings.length - 0.5,
+          reverse: true,
+          ticks: { callback: v => wings[Math.round(v)] !== undefined ? wings[Math.round(v)] : '', stepSize:1, color:'#6b7a8d', font:{size:11,family:'JetBrains Mono,monospace'} },
+          title: { display:true, text:'Wing size', color:'#6b7a8d', font:{size:11} },
+          grid: { display:false },
+          border: { color:'rgba(255,255,255,0.07)' }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx2 => {
+              const ci = Math.round(ctx2.parsed.x), ri = Math.round(ctx2.parsed.y);
+              if (data[ri] && data[ri][ci] !== undefined)
+                return `Expectancy: ${data[ri][ci].toFixed(2)}  Wing: ${wings[ri]}  Credit: $${credits[ci]}`;
+              return '';
+            }
+          },
+          backgroundColor: '#1c2430',
+          borderColor: 'rgba(255,255,255,0.13)',
+          borderWidth: 1,
+          titleColor: '#e8edf3',
+          bodyColor: '#00c896',
+          bodyFont: { family:'JetBrains Mono,monospace', size:12 }
+        }
+      }
+    },
+    plugins: [hmPlugin(data)]
+  });
+}
+
+const lineColors = ['#00c896','#4fa3e0','#f5a623','#e05a5a','#a78bfa'];
+const lineDashes = [[],[5,4],[2,3],[8,3],[4,3]];
+
+let lineChart, barChart;
+
+function buildLine(side) {
+  const data = side === 'puts' ? putsData : callsData;
+  if (lineChart) lineChart.destroy();
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: wings,
+      datasets: credits.map((c,i) => ({
+        label: `$${c}`,
+        data: data.map(r => r[i]),
+        borderColor: lineColors[i],
+        backgroundColor: lineColors[i]+'22',
+        borderDash: lineDashes[i],
+        pointStyle: ['circle','triangle','rect','star','crossRot'][i],
+        pointRadius: 4,
+        tension: 0.35,
+        fill: false
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { title:{display:true,text:'Wing size',color:'#6b7a8d',font:{size:12}}, ticks:{color:'#6b7a8d'}, grid:{color:'rgba(255,255,255,0.05)'}, border:{color:'rgba(255,255,255,0.07)'} },
+        y: { title:{display:true,text:'Expectancy',color:'#6b7a8d',font:{size:12}}, ticks:{color:'#6b7a8d',callback:v=>v.toFixed(2)}, grid:{color:'rgba(255,255,255,0.05)'}, border:{color:'rgba(255,255,255,0.07)'} }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { mode:'index', intersect:false, backgroundColor:'#1c2430', borderColor:'rgba(255,255,255,0.13)', borderWidth:1, titleColor:'#6b7a8d', bodyColor:'#e8edf3', bodyFont:{family:'JetBrains Mono,monospace',size:12} }
+      }
+    }
+  });
+
+  const leg = document.getElementById('lineLegend');
+  leg.innerHTML = credits.map((c,i) =>
+    `<span><span class="leg-sq" style="background:${lineColors[i]}"></span>$${c} credit</span>`
+  ).join('');
+}
+
+function updateLine() {
+  buildLine(document.getElementById('lineSide').value);
+}
+
+function getBarData(creditIdx) {
+  const getPuts = ri => creditIdx === 'all'
+    ? putsData[ri].reduce((s,v)=>s+v,0)/credits.length
+    : putsData[ri][creditIdx];
+  const getCalls = ri => creditIdx === 'all'
+    ? callsData[ri].reduce((s,v)=>s+v,0)/credits.length
+    : callsData[ri][creditIdx];
+  return {
+    puts: wings.map((_,ri) => +getPuts(ri).toFixed(3)),
+    calls: wings.map((_,ri) => +getCalls(ri).toFixed(3))
+  };
+}
+
+function buildBar(creditIdx) {
+  const {puts, calls} = getBarData(creditIdx);
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: wings,
+      datasets: [
+        {
+          label: 'Bull puts',
+          data: puts,
+          backgroundColor: puts.map(v => v >= 0 ? '#00c89644' : '#e05a5a44'),
+          borderColor: puts.map(v => v >= 0 ? '#00c896' : '#e05a5a'),
+          borderWidth: 1.5
+        },
+        {
+          label: 'Bear calls',
+          data: calls,
+          backgroundColor: calls.map(v => v >= 0 ? '#4fa3e044' : '#f5a62344'),
+          borderColor: calls.map(v => v >= 0 ? '#4fa3e0' : '#f5a623'),
+          borderWidth: 1.5
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { title:{display:true,text:'Wing size',color:'#6b7a8d',font:{size:12}}, ticks:{color:'#6b7a8d'}, grid:{color:'rgba(255,255,255,0.05)'}, border:{color:'rgba(255,255,255,0.07)'} },
+        y: { title:{display:true,text:'Expectancy',color:'#6b7a8d',font:{size:12}}, ticks:{color:'#6b7a8d',callback:v=>v.toFixed(2)}, grid:{color:'rgba(255,255,255,0.05)'}, border:{color:'rgba(255,255,255,0.07)'} }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor:'#1c2430', borderColor:'rgba(255,255,255,0.13)', borderWidth:1, titleColor:'#6b7a8d', bodyColor:'#e8edf3', bodyFont:{family:'JetBrains Mono,monospace',size:12} }
+      }
+    }
+  });
+}
+
+function updateBar() {
+  const v = document.getElementById('barCredit').value;
+  buildBar(v === 'all' ? 'all' : parseInt(v));
+}
+
+function switchTab(name, btn) {
+  ['heatmap','line','bar'].forEach(v => {
+    document.getElementById('view-'+v).style.display = v===name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  if (name === 'line' && !lineChart) buildLine('puts');
+  if (name === 'bar' && !barChart) buildBar('all');
+}
+
+window.switchTab = switchTab;
+window.updateLine = updateLine;
+window.updateBar = updateBar;
+
+makeHeatmap('hmPuts', putsData);
+makeHeatmap('hmCalls', callsData);
+</script>
+</body>
+</html>
