@@ -1,0 +1,1033 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPX Entry Time Expectancy Dashboard</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #16212b;
+      --muted: #64717d;
+      --bg: #f3f6f7;
+      --panel: #ffffff;
+      --line: #d9e1e7;
+      --blue: #2458d3;
+      --teal: #0f766e;
+      --green: #087f5b;
+      --red: #c92a2a;
+      --gold: #a16207;
+      --soft: #eef4f6;
+      --shadow: 0 8px 24px rgba(22, 33, 43, .08);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.42;
+    }
+
+    header {
+      padding: 22px 26px;
+      color: #fff;
+      background: #111827;
+      border-bottom: 4px solid #14b8a6;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(25px, 3vw, 42px);
+      letter-spacing: 0;
+    }
+
+    header p {
+      max-width: 1080px;
+      margin: 8px 0 0;
+      color: #d1d9e2;
+      font-size: 15px;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
+      gap: 18px;
+      padding: 20px;
+    }
+
+    aside, .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+    }
+
+    aside {
+      align-self: start;
+      position: sticky;
+      top: 12px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+
+    .block {
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .block:last-child { border-bottom: 0; }
+    h2 {
+      margin: 0 0 12px;
+      color: #344250;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .stack { display: grid; gap: 10px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    label {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    input, select, button {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input, select { padding: 8px 10px; }
+    input[type="file"] { font-size: 12px; }
+    input[type="checkbox"] { width: auto; min-height: 0; }
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 760;
+    }
+
+    button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    button.ghost { background: var(--soft); }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+
+    .checks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 9px;
+      background: #fff;
+      color: #3a4852;
+      font-size: 12px;
+      user-select: none;
+    }
+
+    .content {
+      display: grid;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .panel { padding: 16px; min-width: 0; }
+    .status {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .progress {
+      width: 220px;
+      height: 8px;
+      border-radius: 999px;
+      background: #e5ebef;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+
+    .progress > div {
+      width: 0%;
+      height: 100%;
+      background: var(--teal);
+      transition: width .16s ease;
+    }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .kpi {
+      min-height: 82px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .kpi small {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+    }
+
+    .kpi strong {
+      display: block;
+      margin-top: 5px;
+      font-size: clamp(20px, 2vw, 28px);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    canvas {
+      width: 100%;
+      height: 420px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    .table-wrap {
+      max-height: 540px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 9px 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    th:first-child, td:first-child,
+    th:nth-child(2), td:nth-child(2) { text-align: left; }
+    th {
+      position: sticky;
+      top: 0;
+      background: #f7fafb;
+      color: #46545f;
+      font-size: 12px;
+      z-index: 1;
+    }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+    .gold { color: var(--gold); }
+    .note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .empty {
+      padding: 32px;
+      text-align: center;
+      color: var(--muted);
+      background: #fbfcfd;
+      border: 1px dashed #aebbc5;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 1080px) {
+      main { grid-template-columns: 1fr; }
+      aside { position: static; max-height: none; }
+      .kpis { grid-template-columns: repeat(3, minmax(130px, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      main { padding: 12px; }
+      header { padding: 18px 14px; }
+      .row { grid-template-columns: 1fr; }
+      .kpis { grid-template-columns: 1fr 1fr; }
+      .status { display: grid; }
+      .progress { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SPX Expectancy by Entry Time</h1>
+    <p>Analyze expectancy for a selected wing size across the 26 entry intervals, broken out by weekday, for a chosen credit and stop-loss level.</p>
+  </header>
+
+  <main>
+    <aside>
+      <div class="block">
+        <h2>Data</h2>
+        <div class="stack">
+          <div class="row">
+            <button id="folderBtn" class="primary" type="button">Open Folder</button>
+            <button id="reloadBtn" class="ghost" type="button" disabled>Reload</button>
+          </div>
+          <label>Or select files
+            <input id="fileInput" type="file" multiple webkitdirectory>
+          </label>
+          <button id="clearBtn" class="ghost" type="button">Clear Data</button>
+          <p class="note">Use Reload after adding new backtest files to the selected folder.</p>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>Strategy</h2>
+        <div class="stack">
+          <label>Side
+            <select id="side">
+              <option value="Both">Iron condor</option>
+              <option value="P">Bull put</option>
+              <option value="C">Bear call</option>
+            </select>
+          </label>
+          <label>Wing size
+            <select id="wing"><option value="all">All wing sizes</option></select>
+          </label>
+          <label>Credit
+            <select id="credit"><option value="all">All credits</option></select>
+          </label>
+          <label>Stop loss
+            <select id="stop"><option value="all">All stops</option></select>
+          </label>
+          <label>Minimum entries per day/time
+            <input id="minEntries" type="number" min="1" step="1" value="10">
+          </label>
+        </div>
+      </div>
+
+      <div class="block">
+        <h2>Weekdays</h2>
+        <div id="dayChecks" class="checks"></div>
+      </div>
+
+      <div class="block">
+        <h2>History</h2>
+        <div class="stack">
+          <label>Lookback
+            <select id="lookback">
+              <option value="all">All loaded history</option>
+              <option value="30">Last 30 calendar days</option>
+              <option value="60">Last 60 calendar days</option>
+              <option value="90">Last 90 calendar days</option>
+              <option value="180">Last 180 calendar days</option>
+              <option value="365">Last 1 year</option>
+              <option value="custom">Custom date range</option>
+            </select>
+          </label>
+          <div class="row">
+            <label>From <input id="fromDate" type="date"></label>
+            <label>To <input id="toDate" type="date"></label>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <div class="content">
+      <section class="panel">
+        <div class="status">
+          <div id="statusText">Load a folder or files to begin.</div>
+          <div class="progress" aria-label="Load progress"><div id="progressBar"></div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Summary</h2>
+        <div id="kpis" class="kpis"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Expectancy vs Entry Time</h2>
+        <canvas id="chart" width="1250" height="500"></canvas>
+      </section>
+
+      <section class="panel">
+        <h2>Expectancy Table</h2>
+        <div id="table"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      legs: [],
+      files: [],
+      rows: [],
+      dirHandle: null,
+      minDate: null,
+      maxDate: null
+    };
+
+    const els = {
+      folderBtn: document.getElementById('folderBtn'),
+      reloadBtn: document.getElementById('reloadBtn'),
+      fileInput: document.getElementById('fileInput'),
+      clearBtn: document.getElementById('clearBtn'),
+      statusText: document.getElementById('statusText'),
+      progressBar: document.getElementById('progressBar'),
+      side: document.getElementById('side'),
+      wing: document.getElementById('wing'),
+      credit: document.getElementById('credit'),
+      stop: document.getElementById('stop'),
+      minEntries: document.getElementById('minEntries'),
+      dayChecks: document.getElementById('dayChecks'),
+      lookback: document.getElementById('lookback'),
+      fromDate: document.getElementById('fromDate'),
+      toDate: document.getElementById('toDate'),
+      kpis: document.getElementById('kpis'),
+      chart: document.getElementById('chart'),
+      table: document.getElementById('table')
+    };
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const tradingDays = [1, 2, 3, 4, 5];
+    const dayColors = { 0: '#111827', 1: '#2458d3', 2: '#0f766e', 3: '#a16207', 4: '#7c3aed', 5: '#c92a2a' };
+    const sideLabels = { P: 'Bull put', C: 'Bear call', Both: 'Iron condor' };
+    const stopLabels = { 1: '1x', 1.25: '1.25x', 1.5: '1.5x', 2: '2x', 3: '3x' };
+
+    buildDayChecks();
+    renderEmpty();
+
+    els.folderBtn.addEventListener('click', openFolder);
+    els.reloadBtn.addEventListener('click', reloadFolder);
+    els.fileInput.addEventListener('change', event => loadFiles([...event.target.files]));
+    els.clearBtn.addEventListener('click', clearData);
+    [els.side, els.wing, els.credit, els.stop, els.minEntries, els.lookback, els.fromDate, els.toDate]
+      .forEach(el => el.addEventListener('input', refresh));
+
+    async function openFolder() {
+      if (!window.showDirectoryPicker) {
+        els.statusText.textContent = 'This browser does not expose folder picking. Use the file selector.';
+        els.fileInput.click();
+        return;
+      }
+      try {
+        state.dirHandle = await window.showDirectoryPicker();
+        els.reloadBtn.disabled = false;
+        await loadFiles(await filesFromDirectory(state.dirHandle));
+      } catch (error) {
+        if (error && error.name !== 'AbortError') els.statusText.textContent = error.message;
+      }
+    }
+
+    async function reloadFolder() {
+      if (!state.dirHandle) return;
+      await loadFiles(await filesFromDirectory(state.dirHandle));
+    }
+
+    async function filesFromDirectory(dir) {
+      const files = [];
+      for await (const entry of dir.values()) {
+        if (entry.kind === 'file' && /^Trades.*\./i.test(entry.name)) files.push(await entry.getFile());
+      }
+      return files;
+    }
+
+    async function loadFiles(files) {
+      const matches = files.filter(file => /^Trades.*\./i.test(file.name));
+      if (!matches.length) {
+        els.statusText.textContent = 'No Trades*.* files were selected.';
+        return;
+      }
+
+      state.legs = [];
+      state.files = [];
+      state.rows = [];
+      setProgress(0);
+      els.statusText.textContent = `Loading ${matches.length} file(s)...`;
+
+      for (let i = 0; i < matches.length; i++) {
+        const file = matches[i];
+        const meta = parseFileName(file.name);
+        if (!meta) continue;
+        const parsed = parseCsv(await file.text());
+        const legs = rowsToLegs(parsed.headers, parsed.rows, file.name, meta);
+        state.legs.push(...legs);
+        state.files.push({ name: file.name, rows: legs.length, ...meta });
+        setProgress(((i + 1) / matches.length) * 100);
+        if (i % 3 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      state.legs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+      const dates = state.legs.map(row => row.date).filter(Boolean).sort();
+      state.minDate = dates[0] || null;
+      state.maxDate = dates[dates.length - 1] || null;
+      els.fromDate.value = state.minDate || '';
+      els.toDate.value = state.maxDate || '';
+      updateSelects();
+      refresh();
+    }
+
+    function clearData() {
+      state.legs = [];
+      state.files = [];
+      state.rows = [];
+      state.dirHandle = null;
+      state.minDate = null;
+      state.maxDate = null;
+      els.reloadBtn.disabled = true;
+      els.fileInput.value = '';
+      els.wing.innerHTML = '<option value="all">All wing sizes</option>';
+      els.credit.innerHTML = '<option value="all">All credits</option>';
+      els.stop.innerHTML = '<option value="all">All stops</option>';
+      els.fromDate.value = '';
+      els.toDate.value = '';
+      setProgress(0);
+      els.statusText.textContent = 'Load a folder or files to begin.';
+      renderEmpty();
+    }
+
+    function updateSelects() {
+      fillSelect(els.wing, 'All wing sizes', unique(state.legs.map(row => row.wing)).sort((a, b) => a - b), value => `${value}`);
+      fillSelect(els.credit, 'All credits', unique(state.legs.map(row => row.credit)).sort((a, b) => a - b), value => `$${formatMoney(value)}`);
+      fillSelect(els.stop, 'All stops', unique(state.legs.map(row => row.stop)).sort((a, b) => a - b), value => stopLabels[value] || `${value}x`);
+    }
+
+    function fillSelect(select, allLabel, values, labeler) {
+      const current = select.value;
+      select.innerHTML = `<option value="all">${allLabel}</option>` + values.map(value => `<option value="${value}">${labeler(value)}</option>`).join('');
+      select.value = [...select.options].some(option => option.value === current) ? current : 'all';
+    }
+
+    function buildDayChecks() {
+      els.dayChecks.innerHTML = `
+        <label class="pill"><input type="checkbox" value="0" checked> All Days</label>
+      ` + tradingDays.map(day => `
+        <label class="pill"><input type="checkbox" value="${day}" checked> ${dayNames[day]}</label>
+      `).join('');
+      els.dayChecks.querySelectorAll('input').forEach(input => input.addEventListener('change', refresh));
+    }
+
+    function refresh() {
+      if (!state.legs.length) return renderEmpty();
+      const filters = currentFilters();
+      const legs = state.legs.filter(row => legPasses(row, filters));
+      const trades = filters.side === 'Both' ? buildIronCondors(legs) : legs.filter(row => row.optionType === filters.side);
+      const rows = analyzeByDayTime(trades, filters).filter(row => row.entries >= filters.minEntries);
+      state.rows = rows;
+      renderKpis(rows, trades, filters);
+      renderChart(rows, filters);
+      renderTable(rows);
+      els.statusText.textContent = `${formatInt(legs.length)} filtered option legs, ${formatInt(trades.length)} ${sideLabels[filters.side].toLowerCase()} entries, ${formatInt(rows.length)} day/time rows.`;
+    }
+
+    function currentFilters() {
+      let from = els.fromDate.value || state.minDate;
+      let to = els.toDate.value || state.maxDate;
+      if (els.lookback.value !== 'all' && els.lookback.value !== 'custom' && state.maxDate) {
+        const start = makeDate(state.maxDate);
+        start.setDate(start.getDate() - Number(els.lookback.value));
+        from = toIso(start);
+        to = state.maxDate;
+      }
+      return {
+        side: els.side.value,
+        wing: els.wing.value,
+        credit: els.credit.value,
+        stop: els.stop.value,
+        minEntries: Math.max(1, Number(els.minEntries.value) || 1),
+        selectedDays: checkedDays(),
+        tradeDays: checkedTradeDays(),
+        seriesDays: checkedSeriesDays(),
+        from,
+        to
+      };
+    }
+
+    function checkedDays() {
+      return [...els.dayChecks.querySelectorAll('input:checked')].map(input => Number(input.value));
+    }
+
+    function checkedTradeDays() {
+      const days = checkedDays();
+      return days.includes(0) ? tradingDays : days.filter(day => day !== 0);
+    }
+
+    function checkedSeriesDays() {
+      return checkedDays();
+    }
+
+    function legPasses(row, filters) {
+      if (filters.from && row.date < filters.from) return false;
+      if (filters.to && row.date > filters.to) return false;
+      if (filters.wing !== 'all' && row.wing !== Number(filters.wing)) return false;
+      if (filters.credit !== 'all' && row.credit !== Number(filters.credit)) return false;
+      if (filters.stop !== 'all' && row.stop !== Number(filters.stop)) return false;
+      if (!filters.tradeDays.includes(row.day)) return false;
+      return true;
+    }
+
+    function buildIronCondors(legs) {
+      const groups = new Map();
+      for (const row of legs) {
+        const key = [row.fileName, row.date, row.time, row.wing, row.credit, row.stop].join('|');
+        let group = groups.get(key);
+        if (!group) {
+          group = { put: null, call: null, day: row.day, date: row.date, time: row.time, wing: row.wing, timestamp: row.timestamp };
+          groups.set(key, group);
+        }
+        if (row.optionType === 'P') group.put = row;
+        if (row.optionType === 'C') group.call = row;
+      }
+      const trades = [];
+      for (const group of groups.values()) {
+        if (!group.put || !group.call) continue;
+        trades.push({
+          side: 'Both',
+          day: group.day,
+          date: group.date,
+          time: group.time,
+          wing: group.wing,
+          timestamp: group.timestamp,
+          pnl: group.put.pnl + group.call.pnl
+        });
+      }
+      return trades.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    }
+
+    function analyzeByDayTime(trades, filters) {
+      const stats = new Map();
+      for (const trade of trades) {
+        if (filters.seriesDays.includes(trade.day)) {
+          const dayKey = `${trade.day}|${trade.time}`;
+          if (!stats.has(dayKey)) stats.set(dayKey, initStats(trade.day, trade.time));
+          addTrade(stats.get(dayKey), trade);
+        }
+        if (filters.seriesDays.includes(0)) {
+          const allKey = `0|${trade.time}`;
+          if (!stats.has(allKey)) stats.set(allKey, initStats(0, trade.time));
+          addTrade(stats.get(allKey), trade);
+        }
+      }
+      return [...stats.values()].map(finalizeStats).sort((a, b) => a.day - b.day || a.time.localeCompare(b.time));
+    }
+
+    function initStats(day, time) {
+      return { day, time, entries: 0, wins: 0, losses: 0, pnl: 0, grossWin: 0, grossLoss: 0, equity: 0, peak: 0, maxDrawdown: 0 };
+    }
+
+    function addTrade(stats, trade) {
+      stats.entries++;
+      stats.pnl += trade.pnl;
+      stats.equity += trade.pnl;
+      stats.peak = Math.max(stats.peak, stats.equity);
+      stats.maxDrawdown = Math.min(stats.maxDrawdown, stats.equity - stats.peak);
+      if (trade.pnl > 0) {
+        stats.wins++;
+        stats.grossWin += trade.pnl;
+      } else {
+        stats.losses++;
+        stats.grossLoss += trade.pnl;
+      }
+    }
+
+    function finalizeStats(stats) {
+      return {
+        ...stats,
+        winRate: stats.entries ? stats.wins / stats.entries : 0,
+        expectancy: stats.entries ? stats.pnl / stats.entries : 0,
+        profitFactor: stats.grossLoss === 0 ? Infinity : stats.grossWin / Math.abs(stats.grossLoss)
+      };
+    }
+
+    function renderKpis(rows, trades, filters) {
+      const best = rows.slice().sort((a, b) => b.expectancy - a.expectancy || b.entries - a.entries)[0];
+      const worst = rows.slice().sort((a, b) => a.expectancy - b.expectancy || b.entries - a.entries)[0];
+      const totalPnl = sum(trades, trade => trade.pnl);
+      const totalWins = trades.reduce((count, trade) => count + (trade.pnl > 0 ? 1 : 0), 0);
+      const expectancy = trades.length ? totalPnl / trades.length : 0;
+      const kpis = [
+        ['Files', formatInt(state.files.length), ''],
+        ['Entries', formatInt(trades.length), ''],
+        ['Overall Expectancy', money(expectancy), expectancy >= 0 ? 'positive' : 'negative'],
+        ['Overall Win Rate', trades.length ? pct(totalWins / trades.length) : '0.0%', trades.length && totalWins / trades.length >= .6 ? 'positive' : 'gold'],
+        ['Best Day/Time', best ? `${dayLabel(best.day)} ${shortTime(best.time)}` : '-', 'positive'],
+        ['Best Expectancy', best ? money(best.expectancy) : '$0.00', best && best.expectancy >= 0 ? 'positive' : 'negative'],
+        ['Worst Day/Time', worst ? `${dayLabel(worst.day)} ${shortTime(worst.time)}` : '-', 'negative'],
+        ['Worst Expectancy', worst ? money(worst.expectancy) : '$0.00', worst && worst.expectancy >= 0 ? 'positive' : 'negative'],
+        ['Wing', filters.wing === 'all' ? 'All' : filters.wing, ''],
+        ['Credit', filters.credit === 'all' ? 'All' : `$${formatMoney(filters.credit)}`, ''],
+        ['Stop', filters.stop === 'all' ? 'All' : (stopLabels[filters.stop] || `${filters.stop}x`), ''],
+        ['Rows Shown', formatInt(rows.length), '']
+      ];
+      els.kpis.innerHTML = kpis.map(([label, value, cls]) => `<div class="kpi"><small>${label}</small><strong class="${cls}">${value}</strong></div>`).join('');
+    }
+
+    function renderChart(rows, filters) {
+      const ctx = els.chart.getContext('2d');
+      clearCanvas(ctx, els.chart);
+      drawAxes(ctx, els.chart);
+      if (!rows.length) return drawNoData(ctx, els.chart);
+
+      const times = unique(rows.map(row => row.time)).sort();
+      const [minValue, maxValue] = minMax(rows.map(row => row.expectancy));
+      const range = Math.max(.01, maxValue - minValue);
+      const bottom = minValue - range * .12;
+      const top = maxValue + range * .12;
+      const pad = chartPad();
+      const innerW = els.chart.width - pad.left - pad.right;
+      const innerH = els.chart.height - pad.top - pad.bottom;
+
+      drawGrid(ctx, els.chart, bottom, top, pad);
+      for (const day of filters.seriesDays) {
+        const dayRows = rows.filter(row => row.day === day);
+        if (!dayRows.length) continue;
+        ctx.beginPath();
+        dayRows.forEach((row, i) => {
+          const x = timeX(times, row.time, pad, innerW);
+          const y = valueY(row.expectancy, bottom, top, pad, innerH);
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = dayColors[day];
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        dayRows.forEach(row => {
+          const x = timeX(times, row.time, pad, innerW);
+          const y = valueY(row.expectancy, bottom, top, pad, innerH);
+          ctx.fillStyle = dayColors[day];
+          ctx.beginPath();
+          ctx.arc(x, y, 3.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      drawZeroLine(ctx, els.chart, bottom, top, pad);
+      drawLegend(ctx, els.chart, filters.seriesDays);
+      drawTimeLabels(ctx, els.chart, times, pad, innerW);
+    }
+
+    function renderTable(rows) {
+      if (!rows.length) {
+        els.table.innerHTML = '<div class="empty">No day/time rows meet the current filters.</div>';
+        return;
+      }
+      els.table.innerHTML = `<div class="table-wrap"><table><thead><tr>
+        <th>Day</th><th>Entry Time</th><th>Entries</th><th>Wins</th><th>Losses</th><th>Win Rate</th><th>Expectancy</th><th>Total P/L</th><th>Profit Factor</th><th>Max DD</th>
+      </tr></thead><tbody>${rows.map(row => `<tr>
+        <td>${dayLabel(row.day)}</td>
+        <td>${shortTime(row.time)}</td>
+        <td>${formatInt(row.entries)}</td>
+        <td>${formatInt(row.wins)}</td>
+        <td>${formatInt(row.losses)}</td>
+        <td>${pct(row.winRate)}</td>
+        <td>${spanMoney(row.expectancy)}</td>
+        <td>${spanMoney(row.pnl)}</td>
+        <td>${finite(row.profitFactor)}</td>
+        <td>${spanMoney(row.maxDrawdown)}</td>
+      </tr>`).join('')}</tbody></table></div>`;
+    }
+
+    function renderEmpty() {
+      els.kpis.innerHTML = [
+        ['Files', '0'], ['Entries', '0'], ['Overall Expectancy', '$0.00'], ['Overall Win Rate', '0.0%'],
+        ['Best Day/Time', '-'], ['Best Expectancy', '$0.00'], ['Worst Day/Time', '-'], ['Worst Expectancy', '$0.00'],
+        ['Wing', '-'], ['Credit', '-'], ['Stop', '-'], ['Rows Shown', '0']
+      ].map(([label, value]) => `<div class="kpi"><small>${label}</small><strong>${value}</strong></div>`).join('');
+      const ctx = els.chart.getContext('2d');
+      clearCanvas(ctx, els.chart);
+      drawAxes(ctx, els.chart);
+      drawNoData(ctx, els.chart);
+      els.table.innerHTML = '<div class="empty">Load data to calculate expectancy by entry time.</div>';
+    }
+
+    function parseFileName(name) {
+      const match = name.match(/^Trades-(\d+(?:\.\d+)?)-(\d+(?:\.\d+)?)-([^-.\s]+).*$/i);
+      if (!match) return null;
+      const stopCode = match[3];
+      return {
+        wing: Number(match[1]),
+        creditCode: Number(match[2]),
+        credit: Number(match[2]) / 10,
+        stopCode,
+        stop: stopCode === '125' ? 1.25 : stopCode === '150' ? 1.5 : Number(stopCode)
+      };
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const next = text[i + 1];
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          row.push(cell);
+          cell = '';
+        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+          if (char === '\r' && next === '\n') i++;
+          row.push(cell);
+          if (row.some(value => value !== '')) rows.push(row);
+          row = [];
+          cell = '';
+        } else {
+          cell += char;
+        }
+      }
+      if (cell || row.length) {
+        row.push(cell);
+        if (row.some(value => value !== '')) rows.push(row);
+      }
+      return { headers: rows[0] || [], rows: rows.slice(1) };
+    }
+
+    function rowsToLegs(headers, rows, fileName, meta) {
+      const index = Object.fromEntries(headers.map((header, i) => [header.trim(), i]));
+      if (!('OptionType' in index) || !('OpenDate' in index) || !('OpenTime' in index)) return [];
+      return rows.map(cols => {
+        const date = value(cols, index, 'OpenDate') || normalizeDate(value(cols, index, 'EntryTime'));
+        const time = normalizeTime(value(cols, index, 'OpenTime') || timeFromDateTime(value(cols, index, 'EntryTime')));
+        const rowDate = makeDate(date);
+        const pnl = number(value(cols, index, 'ProfitLossAfterSlippage')) || number(value(cols, index, 'ProfitLoss'));
+        return {
+          fileName,
+          optionType: value(cols, index, 'OptionType').trim().toUpperCase(),
+          date,
+          time,
+          day: rowDate ? rowDate.getDay() : null,
+          timestamp: `${date}T${time || '00:00:00'}`,
+          pnl,
+          ...meta
+        };
+      }).filter(row => row.date && row.time && tradingDays.includes(row.day) && ['P', 'C'].includes(row.optionType) && Number.isFinite(row.pnl));
+    }
+
+    function value(cols, index, key) {
+      return index[key] === undefined ? '' : (cols[index[key]] || '').trim();
+    }
+
+    function normalizeDate(text) {
+      if (!text) return '';
+      const datePart = text.split(/\s+/)[0];
+      if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return datePart;
+      const parts = datePart.split('/');
+      if (parts.length === 3) return `${parts[2].padStart(4, '20')}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      return '';
+    }
+
+    function timeFromDateTime(text) {
+      if (!text) return '';
+      const parts = text.trim().split(/\s+/);
+      return parts.length >= 2 ? parts[1] : '';
+    }
+
+    function normalizeTime(text) {
+      if (!text) return '';
+      const clean = text.trim();
+      const ampm = clean.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)$/i);
+      if (ampm) {
+        let hour = Number(ampm[1]);
+        if (ampm[4].toUpperCase() === 'PM' && hour !== 12) hour += 12;
+        if (ampm[4].toUpperCase() === 'AM' && hour === 12) hour = 0;
+        return `${String(hour).padStart(2, '0')}:${ampm[2]}:${ampm[3] || '00'}`;
+      }
+      const parts = clean.split(':');
+      return parts.length >= 2 ? `${parts[0].padStart(2, '0')}:${parts[1]}:${parts[2] || '00'}` : clean;
+    }
+
+    function number(text) {
+      const n = Number(String(text || '').replace(/[$,%]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+
+    function makeDate(iso) {
+      if (!iso) return null;
+      const [y, m, d] = iso.split('-').map(Number);
+      return new Date(y, m - 1, d, 12, 0, 0);
+    }
+
+    function toIso(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    function unique(values) {
+      return [...new Set(values.filter(value => value !== null && value !== undefined && value !== ''))];
+    }
+
+    function sum(rows, getter) {
+      let total = 0;
+      for (const row of rows) total += getter(row);
+      return total;
+    }
+
+    function minMax(values) {
+      if (!values.length) return [0, 0];
+      let min = Infinity;
+      let max = -Infinity;
+      for (const value of values) {
+        if (value < min) min = value;
+        if (value > max) max = value;
+      }
+      return [min, max];
+    }
+
+    function clearCanvas(ctx, canvas) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function chartPad() {
+      return { left: 76, right: 34, top: 34, bottom: 82 };
+    }
+
+    function drawAxes(ctx, canvas) {
+      const pad = chartPad();
+      ctx.strokeStyle = '#d9e1e7';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, pad.top);
+      ctx.lineTo(pad.left, canvas.height - pad.bottom);
+      ctx.lineTo(canvas.width - pad.right, canvas.height - pad.bottom);
+      ctx.stroke();
+    }
+
+    function drawGrid(ctx, canvas, bottom, top, pad) {
+      const innerH = canvas.height - pad.top - pad.bottom;
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = '#62717d';
+      ctx.strokeStyle = '#edf1f4';
+      for (let i = 0; i <= 5; i++) {
+        const value = bottom + (top - bottom) * i / 5;
+        const y = valueY(value, bottom, top, pad, innerH);
+        ctx.beginPath();
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(canvas.width - pad.right, y);
+        ctx.stroke();
+        ctx.fillText(money(value), 10, y + 4);
+      }
+    }
+
+    function drawZeroLine(ctx, canvas, bottom, top, pad) {
+      if (bottom > 0 || top < 0) return;
+      const y = valueY(0, bottom, top, pad, canvas.height - pad.top - pad.bottom);
+      ctx.strokeStyle = '#8796a3';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(canvas.width - pad.right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    function timeX(times, time, pad, innerW) {
+      const i = times.indexOf(time);
+      return pad.left + (times.length === 1 ? innerW / 2 : i / (times.length - 1) * innerW);
+    }
+
+    function valueY(value, bottom, top, pad, innerH) {
+      if (top === bottom) return pad.top + innerH / 2;
+      return pad.top + innerH - ((value - bottom) / (top - bottom)) * innerH;
+    }
+
+    function drawLegend(ctx, canvas, days) {
+      let x = canvas.width - 510;
+      const y = 22;
+      ctx.font = '13px sans-serif';
+      for (const day of days) {
+        ctx.fillStyle = dayColors[day];
+        ctx.fillRect(x, y - 10, 18, 4);
+        ctx.fillStyle = '#344250';
+        ctx.fillText(dayLabel(day), x + 24, y - 5);
+        x += day === 0 ? 94 : 72;
+      }
+    }
+
+    function drawTimeLabels(ctx, canvas, times, pad, innerW) {
+      ctx.fillStyle = '#62717d';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      times.forEach((time, i) => {
+        if (i % 2 !== 0 && times.length > 18) return;
+        const x = timeX(times, time, pad, innerW);
+        ctx.save();
+        ctx.translate(x, canvas.height - 48);
+        ctx.rotate(-Math.PI / 4);
+        ctx.fillText(shortTime(time), 0, 0);
+        ctx.restore();
+      });
+      ctx.textAlign = 'left';
+      ctx.fillText('Entry time', pad.left + innerW / 2 - 28, canvas.height - 8);
+    }
+
+    function drawNoData(ctx, canvas) {
+      ctx.fillStyle = '#62717d';
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No matching data', canvas.width / 2, canvas.height / 2);
+      ctx.textAlign = 'left';
+    }
+
+    function shortTime(time) {
+      if (!time) return '';
+      const [h, m] = time.split(':').map(Number);
+      const hour = h % 12 || 12;
+      return `${hour}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+    }
+
+    function dayLabel(day) {
+      return day === 0 ? 'All Days' : dayNames[day];
+    }
+
+    function formatMoney(value) {
+      return Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function money(value) {
+      return `${value < 0 ? '-' : ''}$${formatMoney(Math.abs(value))}`;
+    }
+
+    function spanMoney(value) {
+      return `<span class="${value >= 0 ? 'positive' : 'negative'}">${money(value)}</span>`;
+    }
+
+    function pct(value) {
+      return `${(value * 100).toFixed(1)}%`;
+    }
+
+    function finite(value) {
+      return Number.isFinite(value) ? value.toFixed(2) : '∞';
+    }
+
+    function formatInt(value) {
+      return Number(value || 0).toLocaleString();
+    }
+
+    function setProgress(value) {
+      els.progressBar.style.width = `${Math.max(0, Math.min(100, value))}%`;
+    }
+  </script>
+</body>
+</html>
