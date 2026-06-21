@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SPX 1-min Stop-Loss Backtester (2010–2018)</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121821; --panel2:#0e141c; --line:#1f2a38;
+    --text:#dbe6f0; --dim:#7b8ba0; --accent:#3ddc97; --accent2:#ff6b6b;
+    --warn:#e8b339; --mono:'SF Mono','Consolas','Menlo',monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'Segoe UI',Helvetica,Arial,sans-serif;
+    font-size:14px;
+  }
+  header{
+    padding:18px 24px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+  }
+  header h1{font-size:18px; margin:0; letter-spacing:.3px;}
+  header .sub{color:var(--dim); font-size:12.5px;}
+  .wrap{display:grid; grid-template-columns:340px 1fr; gap:0; min-height:calc(100vh - 60px);}
+  .panel{background:var(--panel); border-right:1px solid var(--line); padding:18px; overflow-y:auto;}
+  .main{padding:18px 22px; overflow-x:auto;}
+  fieldset{border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:0 0 14px 0;}
+  legend{color:var(--accent); font-size:12px; text-transform:uppercase; letter-spacing:.06em; padding:0 6px;}
+  label{display:block; font-size:12.5px; color:var(--dim); margin:8px 0 4px;}
+  input[type=number], input[type=text], select{
+    width:100%; background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:6px; padding:6px 8px; font-family:var(--mono); font-size:13px;
+  }
+  input[type=file]{font-size:12px; color:var(--dim);}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px;}
+  .timegrid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:4px; max-height:170px; overflow-y:auto; padding:4px; background:var(--panel2); border-radius:6px; border:1px solid var(--line);}
+  .timegrid label{margin:0; display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:12px; color:var(--text); cursor:pointer;}
+  .timegrid input{width:auto;}
+  .postypes label{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text); margin:4px 0;}
+  .postypes input{width:auto;}
+  button{
+    background:var(--accent); color:#04130b; border:none; border-radius:6px;
+    padding:10px 14px; font-weight:600; cursor:pointer; width:100%; font-size:13.5px;
+  }
+  button:disabled{background:#2a3340; color:var(--dim); cursor:not-allowed;}
+  button.secondary{background:transparent; border:1px solid var(--line); color:var(--text); margin-top:8px;}
+  .hint{color:var(--dim); font-size:11.5px; margin-top:4px; line-height:1.4;}
+  .status{font-size:12.5px; color:var(--dim); margin-top:10px; white-space:pre-wrap; line-height:1.5;}
+  .status b{color:var(--text);}
+  .progressOuter{height:6px; background:var(--panel2); border-radius:4px; margin-top:8px; overflow:hidden; border:1px solid var(--line);}
+  .progressInner{height:100%; width:0%; background:var(--accent); transition:width .15s;}
+  table{border-collapse:collapse; width:100%; font-family:var(--mono); font-size:12.5px;}
+  th, td{padding:6px 10px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap;}
+  th{position:sticky; top:0; background:var(--panel2); cursor:pointer; color:var(--accent); font-weight:600; text-align:right;}
+  th.left, td.left{text-align:left;}
+  tr:hover td{background:#101720;}
+  .badge{display:inline-block; padding:1px 6px; border-radius:4px; font-size:11px;}
+  .badge.green{background:rgba(61,220,151,.15); color:var(--accent);}
+  .badge.red{background:rgba(255,107,107,.15); color:var(--accent2);}
+  .badge.warn{background:rgba(232,179,57,.15); color:var(--warn);}
+  .empty{color:var(--dim); padding:40px; text-align:center;}
+  .toolbar{display:flex; gap:10px; align-items:center; margin-bottom:12px; flex-wrap:wrap;}
+  .toolbar select{width:auto;}
+  .topline{display:flex; gap:18px; margin-bottom:14px; flex-wrap:wrap;}
+  .stat{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 16px; min-width:130px;}
+  .stat .v{font-family:var(--mono); font-size:18px; color:var(--accent);}
+  .stat .l{color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em;}
+  details{margin-top:6px;}
+  summary{color:var(--dim); cursor:pointer; font-size:12px;}
+  code{color:var(--accent);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>SPX 1-min Stop-Loss Backtester (2010–2018)</h1>
+  <div class="sub">Actual SPX 1-min bars, semicolon-delimited folder of files &nbsp;|&nbsp; short put / short call / iron condor (wings ignored) &nbsp;|&nbsp; sweep entry time × margin × stop distance</div>
+</header>
+
+<div class="wrap">
+  <div class="panel">
+
+    <fieldset>
+      <legend>1 — Data file</legend>
+      <input type="file" id="fileInput" webkitdirectory directory multiple>
+      <div class="hint">
+        Select the folder containing your data files (e.g. one file per year, 2010–2018). All files in the folder are read and combined.
+        Expected row format, semicolon-delimited, no header: <code>YYYYMMDD HHMMSS;open;high;low;close;volume</code>
+        (e.g. <code>20101114 180000;1195.5;1195.75;1195.5;1195.75;0</code>).
+        Timestamps are 10.5 hours behind EST — this is corrected automatically.
+        Price is used as-is (no scaling — this is already actual SPX). Bars outside 9:30–16:00 EST are dropped.
+      </div>
+      <div class="status" id="loadStatus">No file loaded.</div>
+      <div class="progressOuter"><div class="progressInner" id="loadBar"></div></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 — Entry times (EST)</legend>
+      <div class="timegrid" id="timeGrid"></div>
+      <button class="secondary" id="selAllTimes" type="button">select all</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 — Position type</legend>
+      <div class="postypes">
+        <label><input type="checkbox" value="put" checked> Short Put only</label>
+        <label><input type="checkbox" value="call" checked> Short Call only</label>
+        <label><input type="checkbox" value="condor"> Iron Condor (short put + short call)</label>
+      </div>
+      <div class="hint">Long wings are ignored throughout — only the short strikes are modeled.</div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4 — Margin (strike distance from entry price, in SPX points)</legend>
+      <div class="row3">
+        <div><label>Min</label><input type="number" id="marginMin" value="60"></div>
+        <div><label>Max</label><input type="number" id="marginMax" value="100"></div>
+        <div><label>Step</label><input type="number" id="marginStep" value="20"></div>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>5 — Stop / threshold distance (points before the short strike)</legend>
+      <div class="row3">
+        <div><label>Min</label><input type="number" id="threshMin" value="5"></div>
+        <div><label>Max</label><input type="number" id="threshMax" value="50"></div>
+        <div><label>Step</label><input type="number" id="threshStep" value="5"></div>
+      </div>
+      <div class="hint">
+        Stop level = strike + threshold (put) / strike − threshold (call). If price touches that level intraday before close, the leg is closed for a loss of <code>threshold</code> points (proxy). If never touched, the leg is held to the close.
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>6 — Assumed credit per winning leg</legend>
+      <input type="number" id="assumedCredit" value="15">
+      <div class="hint">
+        We have no historical option premiums, only the underlying. To compare wins and losses on the same scale, every leg that survives to the close untouched and finishes out-of-the-money is scored as +<code>this many points</code>. Set this to whatever average credit you'd realistically collect for the margin sizes you're testing — it scales the whole table, not the ranking logic.
+      </div>
+    </fieldset>
+
+    <button id="runBtn" disabled>Run backtest</button>
+    <button class="secondary" id="cancelBtn" type="button" style="display:none;">Cancel</button>
+    <div class="status" id="runStatus"></div>
+    <div class="progressOuter"><div class="progressInner" id="runBar"></div></div>
+
+  </div>
+
+  <div class="main" id="mainArea">
+    <div class="empty">Load a data file, set parameters, and run the backtest. Results — ranked by net proxy P&amp;L, win rate, and false-exit rate — will appear here.</div>
+  </div>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------
+   STATE
+--------------------------------------------------------------------- */
+let DAYS = [];          // array of {key, minutes:Int16Array, high:Float32Array, low:Float32Array, close:Float32Array, n}
+let results = [];
+let cancelRequested = false;
+
+const ENTRY_START = 570; // 9:30
+const ENTRY_END   = 945; // 15:45
+const CLOSE_CUTOFF = 960; // 16:00 — stop scanning after this minute-of-day
+
+/* ---------------------------------------------------------------------
+   BUILD ENTRY-TIME CHECKBOX GRID (9:30 .. 15:45 step 15)
+--------------------------------------------------------------------- */
+const timeGrid = document.getElementById('timeGrid');
+const allEntryMinutes = [];
+for (let m = ENTRY_START; m <= ENTRY_END; m += 15) {
+  allEntryMinutes.push(m);
+  const hh = String(Math.floor(m/60)).padStart(2,'0');
+  const mm = String(m%60).padStart(2,'0');
+  const lab = document.createElement('label');
+  lab.innerHTML = `<input type="checkbox" value="${m}" ${ (m===570||m===660||m===780) ? 'checked':'' }> ${hh}:${mm}`;
+  timeGrid.appendChild(lab);
+}
+document.getElementById('selAllTimes').onclick = () => {
+  const boxes = timeGrid.querySelectorAll('input');
+  const allChecked = [...boxes].every(b=>b.checked);
+  boxes.forEach(b=>b.checked = !allChecked);
+};
+
+function minutesToLabel(m){
+  const hh = String(Math.floor(m/60)).padStart(2,'0');
+  const mm = String(m%60).padStart(2,'0');
+  return `${hh}:${mm}`;
+}
+
+/* ---------------------------------------------------------------------
+   FILE PARSING
+   tdate "YYYYMMDD  HH:MM:SS" is 2 hours behind EST -> add 2h.
+   Keep only bars whose EST minute-of-day is within [9:30, 16:00].
+--------------------------------------------------------------------- */
+// Detects which fields hold date/open/high/low/close from a header row,
+// or falls back to the known fixed layout if no header is present.
+function detectColumns(headerCells) {
+  const norm = headerCells.map(c => String(c).trim().toLowerCase());
+  const find = (...names) => {
+    for (const nm of names) {
+      const i = norm.indexOf(nm);
+      if (i !== -1) return i;
+    }
+    return -1;
+  };
+  const dateI = find('tdate','date','timestamp','time');
+  const openI = find('open');
+  const highI = find('high');
+  const lowI  = find('low');
+  const closeI= find('close');
+  if (dateI === -1 || highI === -1 || lowI === -1 || closeI === -1) return null;
+  return { dateI, openI, highI, lowI, closeI };
+}
+
+function looksLikeHeader(cells) {
+  // header row: first non-empty cell is not a pure 8-digit-date-like token
+  const c0 = String(cells[0] ?? '').trim();
+  return !/^\d{8}/.test(c0) && !/^\d+$/.test(c0);
+}
+
+function parseDateCell(raw) {
+  // raw may be "YYYYMMDD  HH:MM:SS" (string, possibly with dashes/slashes/T separators)
+  // or an Excel serial date number.
+  if (typeof raw === 'number' && isFinite(raw)) {
+    // Excel serial date (days since 1899-12-30), fractional part = time
+    const utcDays = Math.floor(raw - 25569);
+    const utcMs = utcDays * 86400 * 1000;
+    const frac = raw - Math.floor(raw);
+    const secs = Math.round(frac * 86400);
+    return new Date(utcMs + secs * 1000);
+  }
+  const s = String(raw).trim();
+  // Pull out date digits (YYYY MM DD) and time digits (HH MM [SS]) regardless of
+  // separators used (none, space, dash, slash, "T", colon, double-space, etc).
+  const m = s.match(/(\d{4})\D{0,2}(\d{2})\D{0,2}(\d{2})\D{1,3}(\d{1,2})\D{0,1}(\d{2})(?:\D{0,1}(\d{2}))?/);
+  if (!m) return null;
+  const year = +m[1], month = +m[2] - 1, day = +m[3];
+  const hour = +m[4], min = +m[5];
+  if (!isFinite(year) || !isFinite(month) || !isFinite(day) || !isFinite(hour) || !isFinite(min)) return null;
+  if (month < 0 || month > 11 || day < 1 || day > 31 || hour > 23 || min > 59) return null;
+  return new Date(Date.UTC(year, month, day, hour, min));
+}
+
+async function rowsFromFile(file) {
+  const name = file.name.toLowerCase();
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    if (typeof XLSX === 'undefined') throw new Error('Excel parser library failed to load (no internet access?). Please export your file as .csv instead.');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+    return rows;
+  } else {
+    const text = await file.text();
+    const lines = text.split('\n').filter(l => l.length > 0);
+    const sample = lines[0] || '';
+    const delim = sample.includes(';') ? ';' : (sample.includes('\t') ? '\t' : ',');
+    return lines.map(l => l.split(delim));
+  }
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = [...e.target.files].filter(f => {
+    const n = f.name.toLowerCase();
+    return n.endsWith('.csv') || n.endsWith('.txt') || n.endsWith('.xlsx') || n.endsWith('.xls');
+  });
+  if (files.length === 0) return;
+  files.sort((a,b) => a.name.localeCompare(b.name)); // keep files in chronological/file-name order
+
+  const loadStatus = document.getElementById('loadStatus');
+  const loadBar = document.getElementById('loadBar');
+  loadBar.style.width = '0%';
+  document.getElementById('runBtn').disabled = true;
+  DAYS = [];
+
+  const dayMap = new Map();
+  const order = [];
+  let parsed = 0, kept = 0, badDates = 0, badPrices = 0;
+  const badDateSamples = [];
+
+  for (let fi = 0; fi < files.length; fi++) {
+    const file = files[fi];
+    loadStatus.textContent = `Reading file ${fi+1}/${files.length}: ${file.name}...`;
+
+    let rows;
+    try {
+      rows = await rowsFromFile(file);
+    } catch (err) {
+      loadStatus.innerHTML = `<span style="color:var(--accent2)">Could not read ${file.name}: ${err.message}</span>`;
+      return;
+    }
+    if (!rows || rows.length === 0) continue;
+
+    // This dataset has no header row: datetime;open;high;low;close;volume
+    let startRow = 0;
+    let cols = { dateI: 0, openI: 1, highI: 2, lowI: 3, closeI: 4 };
+    if (looksLikeHeader(rows[0])) {
+      const detected = detectColumns(rows[0]);
+      if (detected) { cols = detected; startRow = 1; }
+    }
+
+    const n = rows.length;
+    const reportEvery = Math.max(1, Math.floor(n/40));
+
+    for (let i = startRow; i < n; i++) {
+      const r = rows[i];
+      if (!r || r.length <= cols.closeI) continue;
+
+      const dt0 = parseDateCell(r[cols.dateI]);
+      if (!dt0) {
+        badDates++;
+        if (badDateSamples.length < 3) badDateSamples.push(JSON.stringify(r[cols.dateI]));
+        continue;
+      }
+
+      const ms = dt0.getTime() - 10.5 * 60 * 60 * 1000; // shift -10:30 to EST
+      const dt = new Date(ms);
+      const ey = dt.getUTCFullYear(), em = dt.getUTCMonth(), ed = dt.getUTCDate();
+      const minuteOfDay = dt.getUTCHours() * 60 + dt.getUTCMinutes();
+
+      parsed++;
+      if (minuteOfDay < ENTRY_START || minuteOfDay > CLOSE_CUTOFF) continue;
+
+      const high = parseFloat(r[cols.highI]);
+      const low  = parseFloat(r[cols.lowI]);
+      const close= parseFloat(r[cols.closeI]);
+      if (!isFinite(high) || !isFinite(low) || !isFinite(close)) { badPrices++; continue; }
+
+      const dayKey = ey + '-' + String(em+1).padStart(2,'0') + '-' + String(ed).padStart(2,'0');
+      let bucket = dayMap.get(dayKey);
+      if (!bucket) {
+        bucket = { mins: [], high: [], low: [], close: [] };
+        dayMap.set(dayKey, bucket);
+        order.push(dayKey);
+      }
+      bucket.mins.push(minuteOfDay);
+      bucket.high.push(high);
+      bucket.low.push(low);
+      bucket.close.push(close);
+      kept++;
+
+      if (i % reportEvery === 0) {
+        const fileProgress = (i / n);
+        const overallProgress = (fi + fileProgress) / files.length;
+        loadBar.style.width = Math.floor(overallProgress*100) + '%';
+        loadStatus.textContent = `Parsing ${file.name}... ${i.toLocaleString()} / ${n.toLocaleString()} rows (file ${fi+1}/${files.length})`;
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+  }
+
+  for (const key of order) {
+    const b = dayMap.get(key);
+    const idxArr = b.mins.map((_,i)=>i).sort((a,c)=>b.mins[a]-b.mins[c]);
+    const m = new Int16Array(idxArr.length);
+    const h = new Float32Array(idxArr.length);
+    const l = new Float32Array(idxArr.length);
+    const c = new Float32Array(idxArr.length);
+    idxArr.forEach((srcI, dstI) => {
+      m[dstI] = b.mins[srcI]; h[dstI] = b.high[srcI]; l[dstI] = b.low[srcI]; c[dstI] = b.close[srcI];
+    });
+    DAYS.push({ key, minutes: m, high: h, low: l, close: c, n: m.length });
+  }
+  DAYS.sort((a,b) => a.key.localeCompare(b.key));
+
+  loadBar.style.width = '100%';
+  if (DAYS.length === 0) {
+    const sampleMsg = badDateSamples.length ? ` Example raw values that failed: ${badDateSamples.join(', ')}.` : '';
+    loadStatus.innerHTML = `<span style="color:var(--accent2)">No usable rows found.</span> Parsed ${parsed.toLocaleString()} date cells, ${badDates.toLocaleString()} unreadable dates, ${badPrices.toLocaleString()} unreadable prices.${sampleMsg} Check the row format: <code>YYYYMMDD HHMMSS;open;high;low;close;volume</code>.`;
+  } else {
+    loadStatus.innerHTML = `Loaded <b>${files.length}</b> file(s), <b>${DAYS.length.toLocaleString()}</b> trading days, <b>${kept.toLocaleString()}</b> RTH bars (of ${parsed.toLocaleString()} date-parsed rows). Range: <b>${DAYS[0]?.key || '-'}</b> to <b>${DAYS[DAYS.length-1]?.key || '-'}</b>.`;
+  }
+  document.getElementById('runBtn').disabled = DAYS.length === 0;
+});
+
+/* ---------------------------------------------------------------------
+   BACKTEST CORE
+--------------------------------------------------------------------- */
+function binarySearchFirstGTE(arr, target, n) {
+  let lo = 0, hi = n - 1, ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (arr[mid] >= target) { ans = mid; hi = mid - 1; }
+    else lo = mid + 1;
+  }
+  return ans;
+}
+
+// Runs one (entryMinute, margin, threshold, posType) combo across all days.
+// Returns aggregate stats.
+function runCombo(entryMinute, margin, threshold, posType, assumedCredit) {
+  const wantPut = posType === 'put' || posType === 'condor';
+  const wantCall = posType === 'call' || posType === 'condor';
+
+  let trades = 0, wins = 0, stopped = 0, falseExits = 0, breachedNoStop = 0;
+  let totalPnl = 0;
+
+  for (const day of DAYS) {
+    const { minutes, high, low, close, n } = day;
+    if (n === 0) continue;
+    const idx = binarySearchFirstGTE(minutes, entryMinute, n);
+    if (idx === -1) continue; // no bar at/after entry this day
+
+    const entryPrice = close[idx];
+    const putStrike  = entryPrice - margin;
+    const callStrike = entryPrice + margin;
+    const putStop  = putStrike + threshold;   // price level (from above) that triggers the put stop
+    const callStop = callStrike - threshold;  // price level (from below) that triggers the call stop
+
+    let putStopped = false, callStopped = false;
+    for (let j = idx; j < n; j++) {
+      if (wantPut && !putStopped && low[j] <= putStop) putStopped = true;
+      if (wantCall && !callStopped && high[j] >= callStop) callStopped = true;
+      if ((!wantPut || putStopped) && (!wantCall || callStopped)) break;
+    }
+
+    const lastClose = close[n - 1];
+    let pnl = 0;
+    let tradeStopped = false, tradeFalseExit = true, tradeBreachedNoStop = false, tradeWin = true;
+
+    if (wantPut) {
+      if (putStopped) {
+        tradeStopped = true;
+        pnl += -threshold;
+        const wouldHaveWon = lastClose > putStrike;
+        if (!wouldHaveWon) tradeFalseExit = false; // stop was justified for this leg
+        tradeWin = false;
+      } else if (lastClose < putStrike) {
+        pnl += -(putStrike - lastClose);
+        tradeBreachedNoStop = true;
+        tradeWin = false;
+      } else {
+        pnl += assumedCredit;
+      }
+    }
+    if (wantCall) {
+      if (callStopped) {
+        tradeStopped = true;
+        pnl += -threshold;
+        const wouldHaveWon = lastClose < callStrike;
+        if (!wouldHaveWon) tradeFalseExit = false;
+        tradeWin = false;
+      } else if (lastClose > callStrike) {
+        pnl += -(lastClose - callStrike);
+        tradeBreachedNoStop = true;
+        tradeWin = false;
+      } else {
+        pnl += assumedCredit;
+      }
+    }
+
+    trades++;
+    totalPnl += pnl;
+    if (tradeStopped) { stopped++; if (tradeFalseExit) falseExits++; }
+    if (tradeBreachedNoStop) breachedNoStop++;
+    if (tradeWin) wins++;
+  }
+
+  return {
+    entryMinute, margin, threshold, posType,
+    trades, wins, stopped, falseExits, breachedNoStop,
+    winRate: trades ? wins/trades : 0,
+    falseExitRate: stopped ? falseExits/stopped : 0,
+    totalPnl, avgPnl: trades ? totalPnl/trades : 0
+  };
+}
+
+function range(min, max, step) {
+  const out = [];
+  if (step <= 0) { out.push(min); return out; }
+  for (let v = min; v <= max + 1e-9; v += step) out.push(Math.round(v*100)/100);
+  return out;
+}
+
+// For a given entry time, compute per-day: move at close (signed), and the
+// worst intraday excursion in each direction from entry to the close.
+function computeMoveStats(entryMinute) {
+  const closeMoves = [], maxUp = [], maxDown = [];
+  for (const day of DAYS) {
+    const { minutes, high, low, close, n } = day;
+    if (n === 0) continue;
+    const idx = binarySearchFirstGTE(minutes, entryMinute, n);
+    if (idx === -1) continue;
+    const entryPrice = close[idx];
+    let hi = -Infinity, lo = Infinity;
+    for (let j = idx; j < n; j++) {
+      if (high[j] > hi) hi = high[j];
+      if (low[j] < lo) lo = low[j];
+    }
+    closeMoves.push(close[n-1] - entryPrice);
+    maxUp.push(hi - entryPrice);
+    maxDown.push(entryPrice - lo);
+  }
+  return { closeMoves, maxUp, maxDown };
+}
+
+function renderHistogramSVG(values, marginMarkers, width, height, colorPos, colorNeg) {
+  if (values.length === 0) return '<div class="hint">No data.</div>';
+  const min = Math.min(...values, ...marginMarkers.map(m=>-m));
+  const max = Math.max(...values, ...marginMarkers.map(m=>m));
+  const span = max - min;
+  const binCount = 40;
+  const binW = span / binCount || 1;
+  const bins = new Array(binCount).fill(0);
+  values.forEach(v => {
+    let b = Math.floor((v - min) / binW);
+    if (b < 0) b = 0; if (b >= binCount) b = binCount - 1;
+    bins[b]++;
+  });
+  const maxCount = Math.max(...bins);
+  const padL = 40, padB = 24, padT = 10, padR = 10;
+  const plotW = width - padL - padR, plotH = height - padT - padB;
+  const x = v => padL + ((v - min) / span) * plotW;
+  const barW = plotW / binCount;
+
+  let bars = '';
+  for (let b = 0; b < binCount; b++) {
+    const v0 = min + b*binW, v1 = v0 + binW;
+    const mid = (v0+v1)/2;
+    const h = (bins[b] / maxCount) * plotH;
+    const color = mid >= 0 ? colorPos : colorNeg;
+    bars += `<rect x="${x(v0).toFixed(1)}" y="${(padT+plotH-h).toFixed(1)}" width="${(barW-1).toFixed(1)}" height="${h.toFixed(1)}" fill="${color}" opacity="0.75"><title>${mid.toFixed(0)} pts: ${bins[b]} days (${(bins[b]/values.length*100).toFixed(1)}%)</title></rect>`;
+  }
+  let zeroX = x(0);
+  let axis = `<line x1="${zeroX}" y1="${padT}" x2="${zeroX}" y2="${padT+plotH}" stroke="#3a4759" stroke-width="1" stroke-dasharray="2,2"/>`;
+  let markers = '';
+  marginMarkers.forEach(m => {
+    [m, -m].forEach(mm => {
+      const xx = x(mm);
+      markers += `<line x1="${xx}" y1="${padT}" x2="${xx}" y2="${padT+plotH}" stroke="#e8b339" stroke-width="1" stroke-dasharray="4,3" opacity="0.8"/>`;
+      markers += `<text x="${xx}" y="${padT-2}" font-size="9" fill="#e8b339" text-anchor="middle">${mm}</text>`;
+    });
+  });
+  let axisLabels = '';
+  for (let t = Math.ceil(min/50)*50; t <= max; t += 50) {
+    axisLabels += `<text x="${x(t)}" y="${height-6}" font-size="9" fill="#7b8ba0" text-anchor="middle">${t}</text>`;
+  }
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" style="background:var(--panel2); border-radius:6px;">
+    ${bars}${axis}${markers}${axisLabels}
+  </svg>`;
+}
+
+function renderDistribution(entryMinute, margins) {
+  const { closeMoves, maxUp, maxDown } = computeMoveStats(entryMinute);
+  const total = closeMoves.length;
+  if (total === 0) {
+    document.getElementById('distArea').innerHTML = '<div class="hint">No bars found at this entry time.</div>';
+    return;
+  }
+  const histSvg = renderHistogramSVG(closeMoves, margins, 760, 170, '#3ddc97', '#ff6b6b');
+
+  const rows = margins.map(m => {
+    const pBreachPut  = closeMoves.filter(v => v <= -m).length / total;
+    const pBreachCall = closeMoves.filter(v => v >=  m).length / total;
+    const pTestPut    = maxDown.filter(v => v >= m).length / total;
+    const pTestCall   = maxUp.filter(v => v >= m).length / total;
+    return `<tr>
+      <td>±${m}</td>
+      <td>${(pTestPut*100).toFixed(1)}%</td>
+      <td>${(pBreachPut*100).toFixed(1)}%</td>
+      <td>${(pTestCall*100).toFixed(1)}%</td>
+      <td>${(pBreachCall*100).toFixed(1)}%</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('distArea').innerHTML = `
+    <div class="hint" style="margin-bottom:8px;">
+      Distribution of SPX move from entry (${minutesToLabel(entryMinute)} EST) to the close, across ${total.toLocaleString()} days.
+      Yellow dashed lines mark each margin in your current sweep. Green/red bars split gains vs. losses relative to entry.
+    </div>
+    ${histSvg}
+    <table style="margin-top:14px;">
+      <thead><tr>
+        <th class="left">Margin</th>
+        <th>Put: tested intraday</th>
+        <th>Put: breached at close</th>
+        <th>Call: tested intraday</th>
+        <th>Call: breached at close</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="hint" style="margin-top:8px;">
+      "Tested intraday" = the underlying came within reach of that strike at some point before the close (max adverse excursion ≥ margin).
+      "Breached at close" = the strike was actually past the money when the day ended. The gap between the two columns is exactly the
+      space in which a stop can produce a false exit — a stop set tighter than the test distance fires on moves that would have
+      recovered by the close.
+    </div>
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   RUN BUTTON
+--------------------------------------------------------------------- */
+document.getElementById('runBtn').addEventListener('click', async () => {
+  const entryTimes = [...timeGrid.querySelectorAll('input:checked')].map(b => +b.value);
+  const posTypes = [...document.querySelectorAll('.postypes input:checked')].map(b => b.value);
+  const marginMin = +document.getElementById('marginMin').value;
+  const marginMax = +document.getElementById('marginMax').value;
+  const marginStep = +document.getElementById('marginStep').value;
+  const threshMin = +document.getElementById('threshMin').value;
+  const threshMax = +document.getElementById('threshMax').value;
+  const threshStep = +document.getElementById('threshStep').value;
+  const assumedCredit = +document.getElementById('assumedCredit').value;
+
+  if (entryTimes.length === 0 || posTypes.length === 0) {
+    alert('Pick at least one entry time and one position type.');
+    return;
+  }
+
+  const margins = range(marginMin, marginMax, marginStep);
+  const thresholds = range(threshMin, threshMax, threshStep);
+  const totalCombos = entryTimes.length * posTypes.length * margins.length * thresholds.length;
+
+  const runStatus = document.getElementById('runStatus');
+  const runBar = document.getElementById('runBar');
+  const runBtn = document.getElementById('runBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  if (totalCombos > 20000) {
+    if (!confirm(`This will run ${totalCombos.toLocaleString()} combinations across ${DAYS.length.toLocaleString()} days. That may take a while and use significant memory. Continue?`)) {
+      return;
+    }
+  }
+
+  results = [];
+  cancelRequested = false;
+  runBtn.disabled = true;
+  cancelBtn.style.display = 'block';
+  runStatus.textContent = `Running ${totalCombos.toLocaleString()} combinations...`;
+  runBar.style.width = '0%';
+
+  let done = 0;
+  const chunkSize = 25;
+  let comboList = [];
+  for (const et of entryTimes)
+    for (const pt of posTypes)
+      for (const mg of margins)
+        for (const th of thresholds)
+          comboList.push([et, mg, th, pt]);
+
+  for (let i = 0; i < comboList.length; i++) {
+    if (cancelRequested) { runStatus.textContent = 'Cancelled.'; break; }
+    const [et, mg, th, pt] = comboList[i];
+    results.push(runCombo(et, mg, th, pt, assumedCredit));
+    done++;
+    if (done % chunkSize === 0) {
+      runBar.style.width = Math.floor((done/comboList.length)*100) + '%';
+      runStatus.textContent = `Running... ${done.toLocaleString()} / ${comboList.length.toLocaleString()}`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  runBar.style.width = '100%';
+  runStatus.textContent = `Done. ${results.length.toLocaleString()} combinations evaluated across ${DAYS.length.toLocaleString()} days.`;
+  runBtn.disabled = false;
+  cancelBtn.style.display = 'none';
+
+  renderResults();
+});
+
+document.getElementById('cancelBtn').addEventListener('click', () => { cancelRequested = true; });
+
+/* ---------------------------------------------------------------------
+   RESULTS TABLE
+--------------------------------------------------------------------- */
+let sortKey = 'totalPnl', sortDir = -1;
+
+function renderResults() {
+  const main = document.getElementById('mainArea');
+  if (results.length === 0) {
+    main.innerHTML = '<div class="empty">No results.</div>';
+    return;
+  }
+
+  const usedEntryTimes = [...new Set(results.map(r=>r.entryMinute))].sort((a,b)=>a-b);
+  const usedMargins = [...new Set(results.map(r=>r.margin))].sort((a,b)=>a-b);
+
+  const best = results.reduce((a,b)=> a.totalPnl > b.totalPnl ? a : b);
+  const lowestFalseExit = results.filter(r=>r.stopped>0).reduce((a,b)=> (a===null || b.falseExitRate < a.falseExitRate) ? b : a, null);
+
+  main.innerHTML = `
+    <div class="topline">
+      <div class="stat"><div class="v">${results.length.toLocaleString()}</div><div class="l">combinations</div></div>
+      <div class="stat"><div class="v">${minutesToLabel(best.entryMinute)} / ±${best.margin} / sl ${best.threshold}</div><div class="l">best total proxy P&amp;L: ${best.totalPnl.toFixed(0)} pts</div></div>
+      <div class="stat"><div class="v">${lowestFalseExit ? minutesToLabel(lowestFalseExit.entryMinute)+' / ±'+lowestFalseExit.margin+' / sl '+lowestFalseExit.threshold : '—'}</div><div class="l">lowest false-exit rate: ${lowestFalseExit ? (lowestFalseExit.falseExitRate*100).toFixed(1)+'%' : '—'}</div></div>
+    </div>
+
+    <fieldset style="margin-bottom:18px;">
+      <legend>Strike test probability</legend>
+      <div class="toolbar">
+        <span class="hint">Entry time:</span>
+        <select id="distEntrySel">${usedEntryTimes.map(m=>`<option value="${m}">${minutesToLabel(m)}</option>`).join('')}</select>
+      </div>
+      <div id="distArea"></div>
+    </fieldset>
+
+    <div class="toolbar">
+      <span class="hint">Sort by:</span>
+      <select id="sortSel">
+        <option value="totalPnl">Total proxy P&amp;L</option>
+        <option value="avgPnl">Avg proxy P&amp;L / trade</option>
+        <option value="winRate">Win rate</option>
+        <option value="falseExitRate">False-exit rate</option>
+        <option value="stopped">Stop count</option>
+        <option value="trades">Trade count</option>
+      </select>
+      <span class="hint">Top rows shown. Click any column header to sort.</span>
+    </div>
+    <div style="max-height:72vh; overflow:auto; border:1px solid var(--line); border-radius:8px;">
+    <table id="resTable">
+      <thead><tr>
+        <th class="left" data-k="entryMinute">Entry</th>
+        <th class="left" data-k="posType">Position</th>
+        <th data-k="margin">Margin</th>
+        <th data-k="threshold">Stop dist.</th>
+        <th data-k="trades">Trades</th>
+        <th data-k="winRate">Win %</th>
+        <th data-k="stopped">Stops</th>
+        <th data-k="falseExitRate">False-exit %</th>
+        <th data-k="breachedNoStop">Breach (no stop)</th>
+        <th data-k="avgPnl">Avg pnl/trade</th>
+        <th data-k="totalPnl">Total pnl</th>
+      </tr></thead>
+      <tbody id="resBody"></tbody>
+    </table>
+    </div>
+  `;
+
+  document.getElementById('distEntrySel').onchange = (e) => renderDistribution(+e.target.value, usedMargins);
+  renderDistribution(usedEntryTimes[0], usedMargins);
+
+  document.getElementById('sortSel').value = sortKey;
+  document.getElementById('sortSel').onchange = (e) => { sortKey = e.target.value; sortDir = -1; drawRows(); };
+  document.querySelectorAll('#resTable th[data-k]').forEach(th => {
+    th.onclick = () => {
+      const k = th.getAttribute('data-k');
+      if (sortKey === k) sortDir *= -1; else { sortKey = k; sortDir = -1; }
+      document.getElementById('sortSel').value = (k in {totalPnl:1,avgPnl:1,winRate:1,falseExitRate:1,stopped:1,trades:1}) ? k : document.getElementById('sortSel').value;
+      drawRows();
+    };
+  });
+
+  drawRows();
+}
+
+function drawRows() {
+  const sorted = [...results].sort((a,b) => (a[sortKey] - b[sortKey]) * sortDir);
+  const body = document.getElementById('resBody');
+  const top = sorted.slice(0, 500); // cap rendered rows for performance
+  body.innerHTML = top.map(r => {
+    const feClass = r.stopped===0 ? '' : (r.falseExitRate > 0.5 ? 'red' : (r.falseExitRate > 0.2 ? 'warn' : 'green'));
+    const pnlClass = r.totalPnl >= 0 ? 'green' : 'red';
+    return `<tr>
+      <td class="left">${minutesToLabel(r.entryMinute)}</td>
+      <td class="left">${r.posType}</td>
+      <td>±${r.margin}</td>
+      <td>${r.threshold}</td>
+      <td>${r.trades}</td>
+      <td>${(r.winRate*100).toFixed(1)}%</td>
+      <td>${r.stopped}</td>
+      <td>${r.stopped ? `<span class="badge ${feClass}">${(r.falseExitRate*100).toFixed(1)}%</span>` : '—'}</td>
+      <td>${r.breachedNoStop}</td>
+      <td>${r.avgPnl.toFixed(2)}</td>
+      <td><span class="badge ${pnlClass}">${r.totalPnl.toFixed(0)}</span></td>
+    </tr>`;
+  }).join('');
+  if (sorted.length > 500) {
+    body.innerHTML += `<tr><td colspan="11" style="text-align:center; color:var(--dim);">… showing top 500 of ${sorted.length.toLocaleString()} rows by current sort …</td></tr>`;
+  }
+}
+</script>
+</body>
+</html>
